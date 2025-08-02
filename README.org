@@ -1,0 +1,177 @@
+#+TITLE: Guile Scheme LLM Integration Toolkit  
+#+AUTHOR: aygp-dr
+#+DATE: 2025-08-02
+#+PROPERTY: header-args:scheme :session *guile* :results output :exports both
+
+* Guile Scheme LLM Integration Toolkit
+
+A powerful Guile Scheme library for integrating Large Language Models into functional programming workflows, emphasizing composability and type safety.
+
+** Overview
+
+This toolkit provides idiomatic Scheme interfaces for LLM integration:
+
+- Composable prompt construction using S-expressions
+- Type-safe API bindings for multiple LLM providers
+- Functional streaming and batch processing
+- Integration with existing Scheme AI frameworks
+- Meta-programming support for code generation
+
+** Intersections with Existing Projects
+
+- *ollama-topic-forge*: Provides the foundational LLM integration patterns
+- *pseudo-llm-macro*: Macro system for LLM-powered code generation
+- *aibrainrot-zeddev*: Development environment integration examples
+- *multi-framework-agent-lab*: Agent framework comparison and analysis
+
+** Features
+
+*** Functional LLM Interface
+#+BEGIN_SRC scheme
+;; Composable prompt construction
+(define-prompt weather-query
+  `(system "You are a helpful weather assistant.")
+  `(user ,(format #f "What's the weather like in ~a?" city)))
+
+;; Streaming responses with functional processing
+(llm-stream (ollama "llama2")
+            (weather-query "Boston")
+            #:on-token (λ (token) (display token))
+            #:on-complete (λ (response) (process-weather response)))
+#+END_SRC
+
+*** Type-Safe API Bindings
+#+BEGIN_SRC scheme
+;; Provider abstraction with consistent interface
+(define-provider openai
+  #:api-key (getenv "OPENAI_API_KEY")
+  #:model "gpt-4"
+  #:max-tokens 1000)
+
+(define-provider ollama  
+  #:base-url "http://localhost:11434"
+  #:model "llama2")
+
+;; Unified interface across providers
+(llm-complete provider prompt #:temperature 0.7)
+#+END_SRC
+
+*** Meta-Programming Integration  
+#+BEGIN_SRC scheme
+;; LLM-powered macro expansion
+(define-syntax llm-generate
+  (syntax-rules ()
+    ((llm-generate description)
+     (let ((code (llm-complete ollama-code-model description)))
+       (eval-string code)))))
+
+;; Usage: Generate code at compile-time
+(llm-generate "Create a function that calculates fibonacci numbers")
+#+END_SRC
+
+** Architecture
+
+The toolkit is organized into composable modules:
+
+- ~(llm core)~ :: Core LLM abstraction layer
+- ~(llm providers)~ :: Provider-specific implementations
+- ~(llm streaming)~ :: Functional streaming interfaces  
+- ~(llm prompts)~ :: Prompt construction DSL
+- ~(llm types)~ :: Type definitions and contracts
+- ~(llm agents)~ :: Multi-agent conversation patterns
+
+** Provider Support
+
+*** Currently Supported
+- *Ollama*: Local model hosting with full feature support
+- *OpenAI*: GPT-3.5/GPT-4 with streaming and function calling
+- *Anthropic*: Claude models with conversation management
+- *Hugging Face*: Transformers library integration
+
+*** Planned Support
+- *Google Gemini*: Multimodal capabilities
+- *Mistral AI*: European AI provider
+- *Local Models*: Direct transformers.scm integration
+
+** Usage Examples
+
+*** Basic Completion
+#+BEGIN_SRC scheme
+(use-modules (llm core) (llm providers ollama))
+
+(define response
+  (llm-complete (make-ollama #:model "llama2")
+                "Explain recursion in Scheme"))
+
+(display response)
+#+END_SRC
+
+*** Conversation Management
+#+BEGIN_SRC scheme
+(use-modules (llm conversation))
+
+(define chat (make-conversation))
+
+(conversation-add! chat 'user "Hello, I'm learning Scheme")
+(conversation-add! chat 'assistant 
+  (llm-complete provider (conversation->prompt chat)))
+
+(conversation-add! chat 'user "Can you explain macros?")
+(define response 
+  (llm-complete provider (conversation->prompt chat)))
+#+END_SRC
+
+*** Function Calling
+#+BEGIN_SRC scheme
+(use-modules (llm functions))
+
+(define-llm-function get-weather
+  "Get current weather for a city"
+  ((city string? "The city name")))
+
+(define tools (list get-weather))
+
+(llm-complete-with-tools provider
+                         "What's the weather in Boston?"
+                         tools)
+#+END_SRC
+
+** Installation
+
+#+BEGIN_SRC bash
+git clone https://github.com/aygp-dr/scheme-llm-toolkit.git
+cd scheme-llm-toolkit
+
+# Install Guile dependencies
+make install-guile-deps
+
+# Set up provider configurations  
+cp config/providers.example.scm config/providers.scm
+# Edit config/providers.scm with your API keys
+
+# Run tests
+make test
+
+# Install system-wide
+make install
+#+END_SRC
+
+** Configuration
+
+#+BEGIN_SRC scheme
+;; config/providers.scm
+(define-module (config providers))
+
+(define ollama-config
+  `((base-url . "http://localhost:11434")
+    (models . ("llama2" "codellama" "mistral"))))
+
+(define openai-config
+  `((api-key . ,(getenv "OPENAI_API_KEY"))
+    (organization . ,(getenv "OPENAI_ORG"))
+    (models . ("gpt-4" "gpt-3.5-turbo"))))
+#+END_SRC
+
+** License
+
+MIT License - Functional LLM integration for the Scheme ecosystem.
