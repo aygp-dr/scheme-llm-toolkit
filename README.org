@@ -4,7 +4,6 @@
 #+PROPERTY: header-args:scheme :session *guile* :results output :exports both
 
 [[https://github.com/aygp-dr/scheme-llm-toolkit][https://img.shields.io/badge/Guile-Scheme-blue.svg]]
-[[https://github.com/aygp-dr/scheme-llm-toolkit/actions][https://img.shields.io/github/actions/workflow/status/aygp-dr/scheme-llm-toolkit/ci.yml?branch=main]]
 [[https://github.com/aygp-dr/scheme-llm-toolkit/blob/main/LICENSE][https://img.shields.io/badge/License-MIT-green.svg]]
 [[https://github.com/aygp-dr/scheme-llm-toolkit/issues][https://img.shields.io/github/issues/aygp-dr/scheme-llm-toolkit.svg]]
 
