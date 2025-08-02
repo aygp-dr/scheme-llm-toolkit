@@ -1,0 +1,62 @@
+gantt
+    title Guile Scheme LLM Integration Toolkit - Development Roadmap
+    dateFormat  YYYY-MM-DD
+    section Foundation
+    Project Setup           :done,    setup, 2025-08-02, 1d
+    Dependencies Install    :active,  deps, 2025-08-03, 2d
+    Core Module Architecture:         arch, after deps, 3d
+    Provider Abstraction    :         provider, after arch, 4d
+    
+    section Core APIs
+    HTTP Client Framework   :         http-client, after provider, 5d
+    JSON Processing         :         json-proc, after http-client, 3d
+    Streaming Interface     :         streaming, after json-proc, 6d
+    Authentication Module   :         auth, after streaming, 4d
+    
+    section Provider Implementation
+    Ollama Integration      :         ollama, after auth, 5d
+    OpenAI Integration      :         openai, after ollama, 4d
+    Anthropic Integration   :         anthropic, after openai, 4d
+    Hugging Face Integration:         hf, after anthropic, 5d
+    
+    section Prompt Engineering
+    S-Expression DSL        :         sexpr-dsl, after hf, 6d
+    Template System         :         templates, after sexpr-dsl, 4d
+    Prompt Composition      :         composition, after templates, 5d
+    Variable Substitution   :         variables, after composition, 3d
+    
+    section Advanced Features
+    Function Calling        :         functions, after variables, 7d
+    Conversation Management :         conversations, after functions, 5d
+    Batch Processing        :         batch, after conversations, 6d
+    Caching System          :         caching, after batch, 4d
+    
+    section Meta-Programming
+    Code Generation Macros  :         codegen, after caching, 8d
+    Syntax Extensions       :         syntax, after codegen, 6d
+    Compile-Time Integration:         compile-time, after syntax, 7d
+    Runtime Evaluation      :         runtime, after compile-time, 5d
+    
+    section Type Safety
+    Contract System         :         contracts, after runtime, 6d
+    Schema Validation       :         schemas, after contracts, 5d
+    Error Handling          :         errors, after schemas, 4d
+    Type Inference          :         types, after errors, 7d
+    
+    section Testing & Quality
+    Unit Test Suite         :         unit-tests, after types, 4d
+    Integration Tests       :         int-tests, after unit-tests, 5d
+    Performance Benchmarks  :         benchmarks, after int-tests, 6d
+    Provider Compatibility  :         compat, after benchmarks, 4d
+    
+    section Documentation
+    API Documentation       :         api-docs, after compat, 3d
+    Tutorial Examples       :         tutorials, after api-docs, 5d
+    Provider Setup Guides   :         setup-guides, after tutorials, 4d
+    Best Practices Guide    :         best-practices, after setup-guides, 3d
+    
+    section Community
+    Example Applications    :         examples, after best-practices, 6d
+    Community Guidelines    :         community, after examples, 2d
+    Contribution Process    :         contrib, after community, 3d
+    Plugin Architecture     :         plugins, after contrib, 5d

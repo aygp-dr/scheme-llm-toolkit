@@ -1,0 +1,16 @@
+# Research artifacts - ignored from version control
+# These are temporary research files, experimental data, and work-in-progress
+
+# All research artifacts
+*
+
+# But allow the .gitignore itself
+!.gitignore
+
+# Allow README files for documentation
+!README.md
+!README.org
+
+# Allow explicitly committed research findings
+!*.published
+!*.final
