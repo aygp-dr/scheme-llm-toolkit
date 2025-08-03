@@ -1,0 +1,427 @@
+#+TITLE: Day 1: Scheme Foundations for LLM Integration
+#+AUTHOR: aygp-dr
+#+DATE: 2025-08-02
+#+PROPERTY: header-args:scheme :session *guile* :results output :exports both
+
+* Day 1: Scheme Foundations & Literate Programming for LLM Integration
+
+** Overview
+
+This one-day intensive tutorial covers essential Scheme concepts for building an LLM integration toolkit. We'll focus on practical patterns you'll use when interfacing with language models.
+
+** Learning Objectives
+
+By the end of this tutorial, you will:
+- Understand S-expressions as a natural format for prompt engineering
+- Master Scheme's macro system for compile-time code generation
+- Use continuations for handling streaming responses
+- Build a simple Ollama client using literate programming
+- Parse JSON without external dependencies
+- Design function calling interfaces using association lists
+
+** Schedule
+
+| Time       | Topic                                          | Exercise                          |
+|------------+------------------------------------------------+-----------------------------------|
+| 9:00-10:00 | S-expressions for Prompt Engineering           | Build prompt templates            |
+| 10:00-11:00| Macros & Code Generation                       | LLM-powered macro                 |
+| 11:00-12:00| Continuations & Streaming                      | Stream handler implementation     |
+| 1:00-2:00  | HTTP Client Patterns                           | Ollama client with curl           |
+| 2:00-3:00  | JSON Parsing in Pure Scheme                    | Build recursive parser            |
+| 3:00-4:00  | Function Calling & Structured Output           | OpenAPI-style function specs      |
+| 4:00-5:00  | Integration Exercise                           | Complete mini-LLM toolkit         |
+
+** Part 1: S-expressions as Data/Code Duality
+
+*** Key Concept: Homoiconicity
+
+Scheme's homoiconicity means code and data share the same representation. This is perfect for LLM prompts!
+
+#+BEGIN_SRC scheme
+;; A prompt is just data
+(define weather-prompt 
+  '(system "You are a helpful weather assistant."
+    user "What's the weather in Boston?"))
+
+;; But we can also treat it as code
+(define (make-prompt system-msg user-msg)
+  `(system ,system-msg
+    user ,user-msg))
+
+;; Exercise 1.1: Create a prompt template system
+(define (prompt-template name . parts)
+  `(define-prompt ,name
+     ,@(map (lambda (part)
+              (if (string? part)
+                  `(text ,part)
+                  part))
+            parts)))
+#+END_SRC
+
+*** Exercise 1.1: Prompt Template System
+
+Build a DSL for creating reusable prompt templates:
+
+#+BEGIN_SRC scheme
+;; Your task: Implement this macro
+(define-syntax define-prompt-template
+  (syntax-rules (system user assistant)
+    ;; TODO: Implement the macro expansion
+    ))
+
+;; Usage example:
+(define-prompt-template weather-query
+  (system "You are a weather expert.")
+  (user "Tell me about weather in " city))
+
+;; Should expand to a function that takes 'city' as parameter
+(weather-query "Seattle") 
+;; => '((system "You are a weather expert.") 
+;;     (user "Tell me about weather in Seattle"))
+#+END_SRC
+
+** Part 2: Macros for Compile-Time LLM Integration
+
+*** Key Concept: Syntax Transformation
+
+Scheme macros let us generate code at compile time - perfect for LLM-assisted development.
+
+#+BEGIN_SRC scheme
+;; Imagine: LLM generates code during macro expansion
+(define-syntax llm-define-function
+  (syntax-rules ()
+    ((llm-define-function description)
+     ;; In real implementation, this would call LLM
+     (begin
+       (display "Generating function from: ")
+       (display 'description)
+       (newline)
+       ;; Placeholder - would be LLM-generated
+       (define (generated-function x) 
+         (* x 2))))))
+
+;; Exercise 2.1: Build a macro that generates getters/setters
+(define-syntax define-llm-record
+  (syntax-rules ()
+    ;; TODO: Implement record type with LLM-generated accessors
+    ))
+#+END_SRC
+
+*** Exercise 2.1: LLM-Powered Record Types
+
+Create a macro that uses an LLM to generate record type definitions:
+
+#+BEGIN_SRC scheme
+;; Your implementation here
+(define-syntax define-llm-record
+  (syntax-rules ()
+    ((define-llm-record name fields ...)
+     ;; Should generate:
+     ;; - Constructor (make-name)
+     ;; - Predicate (name?)
+     ;; - Getters (name-field)
+     ;; - Setters (name-field-set!)
+     )))
+
+;; Usage:
+(define-llm-record person name age email)
+;; Should create: make-person, person?, person-name, etc.
+#+END_SRC
+
+** Part 3: Continuations for Streaming Responses
+
+*** Key Concept: First-Class Continuations
+
+Continuations capture "what to do next" - ideal for handling streaming LLM responses.
+
+#+BEGIN_SRC scheme
+;; Simple streaming handler using continuations
+(define (stream-handler on-token on-complete)
+  (call/cc
+   (lambda (return)
+     (let loop ((tokens '()))
+       (let ((token (read-next-token))) ; Simulated
+         (if (eof-object? token)
+             (on-complete (reverse tokens))
+             (begin
+               (on-token token)
+               (loop (cons token tokens)))))))))
+
+;; Exercise 3.1: Build a backpressure-aware stream handler
+(define (make-stream-processor buffer-size)
+  ;; TODO: Implement streaming with buffer management
+  )
+#+END_SRC
+
+*** Exercise 3.1: Advanced Stream Processing
+
+Implement a stream processor that handles backpressure:
+
+#+BEGIN_SRC scheme
+;; Your task: Create a stream processor with:
+;; - Buffer management
+;; - Pause/resume capability
+;; - Error recovery
+
+(define (make-advanced-stream-processor config)
+  (let ((buffer (make-vector (assoc-ref config 'buffer-size)))
+        (position 0)
+        (paused #f))
+    ;; TODO: Complete implementation
+    ))
+
+;; Should support:
+(define processor (make-advanced-stream-processor 
+                   '((buffer-size . 1024)
+                     (on-overflow . pause))))
+#+END_SRC
+
+** Part 4: HTTP Client with curl Subprocess
+
+*** Key Concept: Process Communication
+
+Using curl as a subprocess is simple and reliable for HTTP requests.
+
+#+BEGIN_SRC scheme
+(use-modules (ice-9 popen)
+             (ice-9 rdelim)
+             (ice-9 textual-ports))
+
+;; Basic HTTP POST using curl
+(define (http-post url data)
+  (let* ((curl-cmd (format #f "curl -s -X POST -H 'Content-Type: application/json' -d '~a' ~a" 
+                           data url))
+         (port (open-input-pipe curl-cmd))
+         (response (get-string-all port)))
+    (close-pipe port)
+    response))
+
+;; Exercise 4.1: Build complete Ollama client
+(define (ollama-generate model prompt)
+  ;; TODO: Implement full Ollama API client
+  )
+#+END_SRC
+
+*** Exercise 4.1: Complete Ollama Client
+
+Build a full-featured Ollama client:
+
+#+BEGIN_SRC scheme
+;; Your implementation should support:
+;; - Multiple endpoints (generate, chat, embeddings)
+;; - Streaming responses
+;; - Error handling
+;; - Request/response logging
+
+(define-module (ollama client)
+  #:export (ollama-generate
+            ollama-chat
+            ollama-embeddings
+            make-ollama-client))
+
+;; Configuration
+(define (make-ollama-client . args)
+  (let ((base-url (or (assoc-ref args 'base-url) 
+                      "http://localhost:11434")))
+    ;; TODO: Complete implementation
+    ))
+#+END_SRC
+
+** Part 5: JSON Parsing Without Dependencies
+
+*** Key Concept: Recursive Descent Parsing
+
+We'll build a JSON parser using Scheme's pattern matching and recursion.
+
+#+BEGIN_SRC scheme
+;; Simple JSON parser skeleton
+(define (json-read port)
+  (let ((char (peek-char port)))
+    (cond
+     ((eof-object? char) char)
+     ((char=? char #\{) (json-read-object port))
+     ((char=? char #\[) (json-read-array port))
+     ((char=? char #\") (json-read-string port))
+     ((char-numeric? char) (json-read-number port))
+     ((char=? char #\t) (json-read-true port))
+     ((char=? char #\f) (json-read-false port))
+     ((char=? char #\n) (json-read-null port))
+     (else (error "Invalid JSON")))))
+
+;; Exercise 5.1: Complete the parser
+(define (json-read-object port)
+  ;; TODO: Implement object parsing
+  )
+#+END_SRC
+
+*** Exercise 5.1: Complete JSON Parser
+
+Implement a full JSON parser:
+
+#+BEGIN_SRC scheme
+;; Your task: Complete all parsing functions
+;; Should handle:
+;; - Nested objects and arrays
+;; - Escaped strings
+;; - Numbers (int and float)
+;; - Whitespace
+;; - Error reporting with position
+
+(define (json-parse str)
+  (call-with-input-string str json-read))
+
+;; Test cases:
+(json-parse "{\"name\": \"John\", \"age\": 30}")
+;; => ((name . "John") (age . 30))
+
+(json-parse "[1, 2, {\"nested\": true}]")
+;; => (1 2 ((nested . #t)))
+#+END_SRC
+
+** Part 6: Function Calling with Association Lists
+
+*** Key Concept: Function Specifications
+
+We'll use association lists to define function schemas for LLM function calling.
+
+#+BEGIN_SRC scheme
+;; Function specification format
+(define get-weather-spec
+  '((name . "get_weather")
+    (description . "Get current weather for a location")
+    (parameters . ((type . "object")
+                   (properties . ((location . ((type . "string")
+                                               (description . "City name")))
+                                  (units . ((type . "string")
+                                            (enum . ("celsius" "fahrenheit"))
+                                            (description . "Temperature units")))))
+                   (required . (location))))))
+
+;; Exercise 6.1: Build function calling system
+(define (register-function spec implementation)
+  ;; TODO: Create function registry
+  )
+#+END_SRC
+
+*** Exercise 6.1: Function Calling Framework
+
+Build a complete function calling system:
+
+#+BEGIN_SRC scheme
+;; Your implementation should:
+;; - Register functions with specs
+;; - Validate arguments against schema
+;; - Execute functions safely
+;; - Format results for LLM
+
+(define *function-registry* '())
+
+(define (register-llm-function spec impl)
+  ;; TODO: Add to registry with validation
+  )
+
+(define (call-llm-function name args)
+  ;; TODO: Validate and execute
+  )
+
+;; Example usage:
+(register-llm-function
+ '((name . "calculate_fibonacci")
+   (parameters . ((n . ((type . "integer"))))))
+ (lambda (n)
+   ;; Fibonacci implementation
+   ))
+#+END_SRC
+
+** Part 7: Integration Exercise
+
+*** Final Project: Mini LLM Toolkit
+
+Combine everything into a working LLM integration:
+
+#+BEGIN_SRC scheme
+;; Your task: Build a complete mini-toolkit that:
+;; 1. Connects to Ollama
+;; 2. Supports streaming responses
+;; 3. Handles function calling
+;; 4. Uses our JSON parser
+;; 5. Provides a clean API
+
+(define-module (mini-llm-toolkit)
+  #:export (create-llm-session
+            llm-complete
+            llm-stream
+            register-tool
+            with-tools))
+
+;; Skeleton implementation
+(define (create-llm-session . options)
+  ;; TODO: Initialize session with configuration
+  )
+
+(define (llm-complete session prompt)
+  ;; TODO: Synchronous completion
+  )
+
+(define (llm-stream session prompt on-token)
+  ;; TODO: Streaming completion
+  )
+
+;; Example usage:
+(define session (create-llm-session 
+                 #:provider 'ollama
+                 #:model "llama2"))
+
+(register-tool session 'get-weather get-weather-impl)
+
+(llm-complete session 
+              "What's the weather in Boston? Use the get-weather tool.")
+#+END_SRC
+
+** Homework & Next Steps
+
+1. **Extend the JSON parser** to handle Unicode and better error messages
+2. **Add retry logic** to the HTTP client with exponential backoff
+3. **Implement response caching** using Scheme's hash tables
+4. **Create a macro** that generates entire provider modules
+5. **Study existing code**:
+   - `/ollama-topic-forge/experiments/002-ollama-structured-scheme/ollama-structured.scm`
+   - `/aygp-dr/experiments/08-json-parsing-scheme/`
+
+** Additional Resources
+
+- [[https://www.scheme.com/tspl4/][The Scheme Programming Language, 4th Edition]]
+- [[https://docs.racket-lang.org/guide/macros.html][Racket Macro Guide]] (concepts apply to Guile)
+- [[https://www.gnu.org/software/guile/manual/][GNU Guile Reference Manual]]
+- [[https://ollama.ai/docs/api][Ollama API Documentation]]
+
+** Quick Reference Card
+
+#+BEGIN_SRC scheme
+;; Common patterns you'll use
+
+;; Association list manipulation
+(assoc-ref '((a . 1) (b . 2)) 'a) ; => 1
+(acons 'c 3 '((a . 1))) ; => ((c . 3) (a . 1))
+
+;; String formatting
+(format #f "Hello, ~a!" "world") ; => "Hello, world!"
+
+;; Process communication
+(use-modules (ice-9 popen))
+(open-input-pipe "command")
+
+;; Error handling
+(catch 'key
+  (lambda () ; try
+    (risky-operation))
+  (lambda (key . args) ; catch
+    (handle-error key args)))
+
+;; Module definition
+(define-module (my module)
+  #:use-module (ice-9 match)
+  #:export (public-func))
+#+END_SRC
+
+Happy hacking! 🎯
