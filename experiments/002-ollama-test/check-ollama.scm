@@ -1,4 +1,4 @@
-#!/usr/bin/env guile
+#!/usr/bin/env guile3
 !#
 
 ;;; check-ollama.scm --- Check if Ollama server is running

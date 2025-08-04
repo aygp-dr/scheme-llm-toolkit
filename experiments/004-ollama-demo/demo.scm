@@ -1,4 +1,4 @@
-#!/usr/bin/env guile
+#!/usr/bin/env guile3
 !#
 
 ;;; demo.scm --- Demonstrate Ollama integration

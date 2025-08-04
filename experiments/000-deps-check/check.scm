@@ -1,4 +1,4 @@
-#!/usr/bin/env guile
+#!/usr/bin/env guile3
 ;; Dependency Check for Guile Scheme LLM Integration Toolkit
 ;; Confirms Guile 3.0+ and HTTP/JSON capabilities
 

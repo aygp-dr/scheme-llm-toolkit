@@ -1,4 +1,4 @@
-#!/usr/bin/env guile
+#!/usr/bin/env guile3
 !#
 
 ;;; test-ollama.scm --- Test Ollama provider implementation

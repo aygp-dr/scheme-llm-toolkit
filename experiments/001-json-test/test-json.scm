@@ -1,4 +1,4 @@
-#!/usr/bin/env guile
+#!/usr/bin/env guile3
 !#
 
 ;;; test-json.scm --- Test JSON parsing and generation
