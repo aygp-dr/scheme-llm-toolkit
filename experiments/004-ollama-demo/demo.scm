@@ -1,6 +1,3 @@
-#!/usr/bin/env guile3
-!#
-
 ;;; demo.scm --- Demonstrate Ollama integration
 
 (add-to-load-path "../../src")

@@ -1,6 +1,3 @@
-#!/usr/bin/env guile3
-!#
-
 ;;; test-ollama.scm --- Test Ollama provider implementation
 
 (add-to-load-path "../../src")

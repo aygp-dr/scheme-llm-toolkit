@@ -1,6 +1,3 @@
-#!/usr/bin/env guile3
-!#
-
 ;;; test-provider.scm --- Test provider abstraction
 
 (add-to-load-path "../../src")

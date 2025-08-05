@@ -1,6 +1,3 @@
-#!/usr/bin/env guile3
-!#
-
 ;;; check-ollama.scm --- Check if Ollama server is running
 
 (add-to-load-path "../../src")
