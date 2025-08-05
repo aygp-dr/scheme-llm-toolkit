@@ -140,24 +140,39 @@ The toolkit is organized into composable modules:
                          tools)
 #+END_SRC
 
-** Installation
+** Quick Start
 
 #+BEGIN_SRC bash
+# Clone and setup
 git clone https://github.com/aygp-dr/scheme-llm-toolkit.git
 cd scheme-llm-toolkit
 
-# Install Guile dependencies
+# Check dependencies (all core functionality tested)
 make install-guile-deps
 
-# Set up provider configurations  
+# Run dependency check
+guile3 experiments/000-deps-check/check.scm
+
+# Test JSON functionality
+guile3 -L src experiments/001-json-test/test-json.scm
+
+# Set up provider configurations (optional)
 cp config/providers.example.scm config/providers.scm
-# Edit config/providers.scm with your API keys
+# Edit config/providers.scm with your API keys for external providers
+#+END_SRC
 
-# Run tests
-make test
+*** System Requirements
+- Guile 3.0+ (tested on 3.0.10)
+- guile-json (install manually if auto-install fails)
+- curl or wget (for HTTP requests)
+- Optional: Ollama (for local LLM testing)
 
-# Install system-wide
-make install
+*** FreeBSD Installation Notes
+#+BEGIN_SRC bash
+# Install dependencies
+pkg install guile3 guile-json curl
+
+# The toolkit uses guile3 shebang for FreeBSD compatibility
 #+END_SRC
 
 ** Configuration
