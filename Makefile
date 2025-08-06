@@ -3,6 +3,8 @@ SHELL := /bin/bash
 .PHONY: all install install-guile-deps test clean help
 
 # Configuration
+PROJECT_NAME := scheme-llm-toolkit
+PROJECT_ROOT := $(shell pwd)
 PREFIX ?= /usr/local
 GUILE ?= guile3
 GUILE_SITE_DIR ?= $(shell $(GUILE) -c "(display (%site-dir))")
@@ -21,12 +23,40 @@ TEST_SOURCES := $(shell find $(TEST_DIR) -name "*.scm" 2>/dev/null || echo "")
 # Default target
 all: help
 
+# Development environment setup
+.PHONY: dev-env
+dev-env:
+	@echo "Starting development environment with tmux and Emacs..."
+	@# Check if tmux session already exists
+	@if tmux has-session -t $(PROJECT_NAME) 2>/dev/null; then \
+		echo "Tmux session '$(PROJECT_NAME)' already exists. Attaching..."; \
+		tmux attach-session -t $(PROJECT_NAME); \
+	else \
+		echo "Creating new tmux session '$(PROJECT_NAME)'..."; \
+		tmux new-session -d -s $(PROJECT_NAME) -c $(PROJECT_ROOT) "emacs -nw -Q -l $(PROJECT_ROOT)/$(PROJECT_NAME).el"; \
+		echo "Session created. TTY: $$(tmux list-panes -t $(PROJECT_NAME) -F '#{pane_tty}')"; \
+		echo "To attach: tmux attach-session -t $(PROJECT_NAME)"; \
+		tmux attach-session -t $(PROJECT_NAME); \
+	fi
+
+# Get tmux session TTY
+.PHONY: dev-tty
+dev-tty:
+	@if tmux has-session -t $(PROJECT_NAME) 2>/dev/null; then \
+		echo "TTY for $(PROJECT_NAME) session:"; \
+		tmux list-panes -t $(PROJECT_NAME) -F "#{pane_tty}"; \
+	else \
+		echo "No tmux session '$(PROJECT_NAME)' found. Run 'make dev-env' first."; \
+	fi
+
 # Help target
 help:
 	@echo "Guile Scheme LLM Integration Toolkit"
 	@echo "===================================="
 	@echo ""
 	@echo "Available targets:"
+	@echo "  make dev-env            - Start tmux/Emacs development environment"
+	@echo "  make dev-tty            - Get TTY of running dev environment"
 	@echo "  make install-guile-deps  - Install Guile dependencies"
 	@echo "  make test               - Run all tests"
 	@echo "  make install            - Install system-wide"
