@@ -113,12 +113,17 @@
                      (top-p #f)
                      (frequency-penalty #f)
                      (presence-penalty #f)
-                     (stop #f))
-  "Chat with OpenAI using the chat completions endpoint."
-  
-  (let* ((url (format #f "~a/chat/completions" 
+                     (stop #f)
+                     (tools #f)
+                     (tool-choice #f))
+  "Chat with OpenAI using the chat completions endpoint.
+
+   Optional tools parameter accepts a list of tool schemas in OpenAI format.
+   Use tools->openai-format from (llm core tools) to convert tool definitions."
+
+  (let* ((url (format #f "~a/chat/completions"
                       (openai-provider-base-url provider)))
-         (request-data `((model . ,(or model 
+         (request-data `((model . ,(or model
                                        (openai-provider-default-model provider)))
                         (messages . ,(map normalize-openai-message messages))
                         (stream . ,stream)
@@ -127,7 +132,9 @@
                         ,@(if top-p `((top_p . ,top-p)) '())
                         ,@(if frequency-penalty `((frequency_penalty . ,frequency-penalty)) '())
                         ,@(if presence-penalty `((presence_penalty . ,presence-penalty)) '())
-                        ,@(if stop `((stop . ,stop)) '()))))
+                        ,@(if stop `((stop . ,stop)) '())
+                        ,@(if tools `((tools . ,tools)) '())
+                        ,@(if tool-choice `((tool_choice . ,tool-choice)) '()))))
     
     (if stream
         ;; Streaming chat response
@@ -165,8 +172,15 @@
                                   'timeout (openai-provider-timeout provider))))
           (let* ((choices (assoc-ref response 'choices))
                  (first-choice (and choices (not (null? choices)) (car choices)))
-                 (message (and first-choice (assoc-ref first-choice 'message))))
-            (and message (assoc-ref message 'content)))))))
+                 (message (and first-choice (assoc-ref first-choice 'message)))
+                 (tool-calls (and message (assoc-ref message 'tool_calls))))
+            ;; If tool calls present, return full message structure
+            (if tool-calls
+                `((role . "assistant")
+                  (content . ,(assoc-ref message 'content))
+                  (tool_calls . ,tool-calls))
+                ;; Otherwise just return content string
+                (and message (assoc-ref message 'content))))))))
 
 (define (normalize-openai-message msg)
   "Normalize message format for OpenAI API."

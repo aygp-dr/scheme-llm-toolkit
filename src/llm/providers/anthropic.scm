@@ -115,21 +115,30 @@
                         (system #f)
                         (top-p #f)
                         (top-k #f)
-                        (stop-sequences #f))
-  "Chat with Anthropic Claude using the Messages endpoint."
+                        (stop-sequences #f)
+                        (tools #f)
+                        (tool-choice #f))
+  "Chat with Anthropic Claude using the Messages endpoint.
+
+   Optional tools parameter accepts a list of tool schemas in Anthropic format.
+   Use tools->anthropic-format from (llm core tools) to convert tool definitions."
 
   (let* ((url (format #f "~a/messages"
                       (anthropic-provider-base-url provider)))
+         ;; Filter out any #f values from normalized messages
+         (valid-messages (filter identity (map normalize-anthropic-message messages)))
          (request-data `((model . ,(or model
                                        (anthropic-provider-default-model provider)))
-                        (messages . ,(map normalize-anthropic-message messages))
+                        (messages . ,valid-messages)
                         (max_tokens . ,max-tokens)
                         (stream . ,stream)
                         ,@(if system `((system . ,system)) '())
                         ,@(if temperature `((temperature . ,temperature)) '())
                         ,@(if top-p `((top_p . ,top-p)) '())
                         ,@(if top-k `((top_k . ,top-k)) '())
-                        ,@(if stop-sequences `((stop_sequences . ,stop-sequences)) '()))))
+                        ,@(if stop-sequences `((stop_sequences . ,stop-sequences)) '())
+                        ,@(if tools `((tools . ,tools)) '())
+                        ,@(if tool-choice `((tool_choice . ,tool-choice)) '()))))
 
     (if stream
         ;; Streaming chat response
@@ -169,8 +178,26 @@
                                   'headers (make-auth-headers provider)
                                   'timeout (anthropic-provider-timeout provider))))
           (let* ((content (assoc-ref response 'content))
-                 (first-block (and content (not (null? content)) (car content))))
-            (and first-block (assoc-ref first-block 'text)))))))
+                 (stop-reason (assoc-ref response 'stop_reason))
+                 ;; Check if there are tool_use blocks
+                 (tool-use-blocks (filter (lambda (block)
+                                           (string=? (assoc-ref block 'type) "tool_use"))
+                                         (or content '())))
+                 ;; Get text blocks
+                 (text-blocks (filter (lambda (block)
+                                       (string=? (assoc-ref block 'type) "text"))
+                                     (or content '())))
+                 (text-content (if (null? text-blocks)
+                                  #f
+                                  (assoc-ref (car text-blocks) 'text))))
+            ;; If tool use blocks present, return full structure
+            (if (not (null? tool-use-blocks))
+                `((role . "assistant")
+                  (content . ,text-content)
+                  (tool_use . ,tool-use-blocks)
+                  (stop_reason . ,stop-reason))
+                ;; Otherwise just return text content
+                text-content)))))))
 
 (define (normalize-anthropic-message msg)
   "Normalize message format for Anthropic API.
