@@ -29,8 +29,16 @@
 (define anthropic-config
   `((api-key . ,(or (getenv "ANTHROPIC_API_KEY") "YOUR_ANTHROPIC_API_KEY_HERE"))
     (base-url . "https://api.anthropic.com/v1")
-    (models . ("claude-3-opus" "claude-3-sonnet" "claude-3-haiku"))
-    (max-tokens . 4000)))
+    (api-version . "2023-06-01")
+    (models . ("claude-opus-4-20250514"
+               "claude-sonnet-4-20250514"
+               "claude-3-5-sonnet-20241022"
+               "claude-3-5-haiku-20241022"
+               "claude-3-opus-20240229"
+               "claude-3-haiku-20240307"))
+    (default-model . "claude-sonnet-4-20250514")
+    (max-tokens . 4096)
+    (timeout . 300)))
 
 ;; Hugging Face Configuration
 (define huggingface-config
