@@ -19,9 +19,11 @@
   `((api-key . ,(or (getenv "OPENAI_API_KEY") "YOUR_OPENAI_API_KEY_HERE"))
     (organization . ,(getenv "OPENAI_ORG"))
     (base-url . "https://api.openai.com/v1")
-    (models . ("gpt-4" "gpt-3.5-turbo" "gpt-4-turbo-preview"))
+    (models . ("gpt-4" "gpt-3.5-turbo" "gpt-4-turbo-preview" "gpt-4o" "gpt-4o-mini"))
+    (default-model . "gpt-3.5-turbo")
     (max-tokens . 2000)
-    (temperature . 0.7)))
+    (temperature . 0.7)
+    (timeout . 300)))
 
 ;; Anthropic Configuration
 (define anthropic-config
