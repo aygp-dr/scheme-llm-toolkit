@@ -1,5 +1,6 @@
 # Guile Scheme LLM Integration Toolkit Makefile
-SHELL := /bin/bash
+# Use bash from PATH for FreeBSD/Linux compatibility
+SHELL := $(shell which bash)
 .PHONY: all install install-guile-deps test clean help
 
 # Configuration
