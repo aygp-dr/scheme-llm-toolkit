@@ -1,7 +1,7 @@
 # Guile Scheme LLM Integration Toolkit Makefile
 # FreeBSD and Linux compatible
 
-.PHONY: all install install-guile-deps test clean help check-system
+.PHONY: all install install-guile-deps install-guile-json test clean help check-system
 
 # Detect operating system
 UNAME_S := $(shell uname -s)
@@ -106,14 +106,15 @@ help:
 	@echo "Detected: $(UNAME_S) (use '$(MAKE_CMD)' to run)"
 	@echo ""
 	@echo "Available targets:"
-	@echo "  $(MAKE_CMD) check-system      - Show system configuration"
-	@echo "  $(MAKE_CMD) dev-env           - Start tmux/Emacs development environment"
-	@echo "  $(MAKE_CMD) dev-tty           - Get TTY of running dev environment"
+	@echo "  $(MAKE_CMD) check-system       - Show system configuration"
+	@echo "  $(MAKE_CMD) dev-env            - Start tmux/Emacs development environment"
+	@echo "  $(MAKE_CMD) dev-tty            - Get TTY of running dev environment"
+	@echo "  $(MAKE_CMD) install-guile-json - Install guile-json (FreeBSD: from source)"
 	@echo "  $(MAKE_CMD) install-guile-deps - Install Guile dependencies"
-	@echo "  $(MAKE_CMD) test              - Run all tests"
-	@echo "  $(MAKE_CMD) install           - Install system-wide"
-	@echo "  $(MAKE_CMD) clean             - Clean build artifacts"
-	@echo "  $(MAKE_CMD) help              - Show this help message"
+	@echo "  $(MAKE_CMD) test               - Run all tests"
+	@echo "  $(MAKE_CMD) install            - Install system-wide"
+	@echo "  $(MAKE_CMD) clean              - Clean build artifacts"
+	@echo "  $(MAKE_CMD) help               - Show this help message"
 	@echo ""
 	@echo "Configuration:"
 	@echo "  PREFIX=$(PREFIX)"
@@ -122,7 +123,20 @@ help:
 ifeq ($(UNAME_S),FreeBSD)
 	@echo ""
 	@echo "FreeBSD Quick Start:"
-	@echo "  pkg install guile3 guile3-json curl"
+	@echo "  pkg install guile3 curl bash"
+	@echo "  $(MAKE_CMD) install-guile-json  # Build guile-json from source"
+endif
+
+# Install guile-json from source (required on FreeBSD)
+install-guile-json:
+ifeq ($(UNAME_S),FreeBSD)
+	@echo "Installing guile-json from source..."
+	@./scripts/install-guile-json-freebsd.sh
+else
+	@echo "On $(UNAME_S), use your package manager:"
+	@echo "  Debian/Ubuntu: apt install guile-json"
+	@echo "  macOS: brew install guile-json"
+	@echo "  Guix: guix install guile-json"
 endif
 
 # Install Guile dependencies
