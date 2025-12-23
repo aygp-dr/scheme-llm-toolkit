@@ -1,0 +1,367 @@
+# Agent Task Configuration
+# Machine-readable task definitions for AI agents
+
+metadata:
+  project: scheme-llm-toolkit
+  language: guile-scheme
+  test_command: "guile3 -L src {test_file}"
+
+tasks:
+  # Provider Implementations
+  - id: "013-gemini"
+    name: "Google Gemini Provider"
+    category: providers
+    difficulty: medium
+    priority: P2
+    inputs:
+      - "src/llm/providers/openai.scm"
+      - "src/llm/providers/anthropic.scm"
+      - "src/llm/core/provider.scm"
+    outputs:
+      - "src/llm/providers/gemini.scm"
+      - "src/llm/providers/gemini-provider.scm"
+      - "experiments/013-gemini-test/test-gemini.scm"
+    env_vars:
+      - "GEMINI_API_KEY"
+    api_docs: "https://ai.google.dev/api/rest"
+    success_criteria:
+      - "Module loads: (use-modules (llm providers gemini))"
+      - "Implements provider-complete"
+      - "Implements provider-chat"
+      - "Test file runs without errors"
+
+  - id: "014-huggingface"
+    name: "Hugging Face Inference Provider"
+    category: providers
+    difficulty: medium
+    priority: P2
+    inputs:
+      - "src/llm/providers/openai.scm"
+      - "src/llm/core/provider.scm"
+    outputs:
+      - "src/llm/providers/huggingface.scm"
+      - "experiments/014-huggingface-test/test-hf.scm"
+    env_vars:
+      - "HF_TOKEN"
+    api_docs: "https://huggingface.co/docs/api-inference/"
+    success_criteria:
+      - "Supports text-generation endpoint"
+      - "Supports feature-extraction (embeddings)"
+
+  - id: "015-cohere"
+    name: "Cohere Provider"
+    category: providers
+    difficulty: medium
+    priority: P3
+    inputs:
+      - "src/llm/providers/openai.scm"
+    outputs:
+      - "src/llm/providers/cohere.scm"
+      - "experiments/015-cohere-test/test-cohere.scm"
+    env_vars:
+      - "COHERE_API_KEY"
+    api_docs: "https://docs.cohere.com/reference/"
+
+  # Prompt Engineering
+  - id: "016-chain-of-thought"
+    name: "Chain-of-Thought Prompting"
+    category: prompts
+    difficulty: easy
+    priority: P2
+    inputs:
+      - "src/llm/core/prompts.scm"
+    outputs:
+      - "src/llm/prompts/chain-of-thought.scm"
+      - "experiments/016-cot/test-cot.scm"
+      - "experiments/016-cot/examples.scm"
+    success_criteria:
+      - "cot-prompt function defined"
+      - "Includes 'Let's think step by step' pattern"
+      - "Test with arithmetic problem"
+
+  - id: "017-few-shot"
+    name: "Few-Shot Learning Templates"
+    category: prompts
+    difficulty: easy
+    priority: P2
+    inputs:
+      - "src/llm/core/prompts.scm"
+    outputs:
+      - "src/llm/prompts/few-shot.scm"
+      - "experiments/017-few-shot/test-few-shot.scm"
+    success_criteria:
+      - "make-few-shot-prompt accepts example pairs"
+      - "Formats examples consistently"
+
+  - id: "018-self-consistency"
+    name: "Self-Consistency Sampling"
+    category: prompts
+    difficulty: medium
+    priority: P3
+    inputs:
+      - "src/llm/core/prompts.scm"
+      - "src/llm/core/provider.scm"
+    outputs:
+      - "src/llm/prompts/self-consistency.scm"
+      - "experiments/018-self-consistency/test-sc.scm"
+    success_criteria:
+      - "sample-n-completions function"
+      - "majority-vote aggregation"
+      - "Returns confidence score"
+
+  # Evaluation
+  - id: "019-quality-metrics"
+    name: "Response Quality Evaluation"
+    category: eval
+    difficulty: medium
+    priority: P2
+    inputs:
+      - "src/llm/core/contracts.scm"
+    outputs:
+      - "src/llm/eval/quality.scm"
+      - "experiments/019-quality/test-quality.scm"
+    success_criteria:
+      - "coherence-score function (0-1)"
+      - "relevance-score function (0-1)"
+      - "Uses contracts for validation"
+
+  - id: "020-toxicity"
+    name: "Content Safety Detection"
+    category: eval
+    difficulty: medium
+    priority: P2
+    inputs:
+      - "src/llm/core/contracts.scm"
+    outputs:
+      - "src/llm/eval/safety.scm"
+      - "experiments/020-toxicity/test-safety.scm"
+    success_criteria:
+      - "toxicity-check predicate"
+      - "Test with safe/unsafe examples"
+
+  - id: "021-factuality"
+    name: "Factuality Grounding"
+    category: eval
+    difficulty: hard
+    priority: P3
+    inputs:
+      - "src/llm/core/structured.scm"
+    outputs:
+      - "src/llm/eval/factuality.scm"
+      - "experiments/021-factuality/test-factuality.scm"
+    success_criteria:
+      - "extract-claims function"
+      - "ground-against-context function"
+
+  # RAG
+  - id: "022-embeddings"
+    name: "Embedding Similarity Search"
+    category: rag
+    difficulty: medium
+    priority: P2
+    inputs: []
+    outputs:
+      - "src/llm/rag/embeddings.scm"
+      - "src/llm/rag/similarity.scm"
+      - "experiments/022-embeddings/test-embeddings.scm"
+    success_criteria:
+      - "cosine-similarity function"
+      - "top-k-similar function"
+
+  - id: "023-chunking"
+    name: "Document Chunking"
+    category: rag
+    difficulty: easy
+    priority: P2
+    inputs: []
+    outputs:
+      - "src/llm/rag/chunking.scm"
+      - "experiments/023-chunking/test-chunking.scm"
+    success_criteria:
+      - "chunk-by-tokens function"
+      - "chunk-by-sentences function"
+      - "chunk-with-overlap function"
+
+  - id: "024-context"
+    name: "Context Window Packing"
+    category: rag
+    difficulty: medium
+    priority: P3
+    inputs:
+      - "src/llm/core/compaction.scm"
+    outputs:
+      - "src/llm/rag/context.scm"
+      - "experiments/024-context/test-context.scm"
+    success_criteria:
+      - "pack-context fits chunks to token limit"
+      - "Prioritizes by relevance"
+
+  # Multi-Agent
+  - id: "025-debate"
+    name: "Multi-Agent Debate"
+    category: agents
+    difficulty: hard
+    priority: P3
+    inputs:
+      - "src/llm/core/prompts.scm"
+      - "src/llm/core/provider.scm"
+    outputs:
+      - "src/llm/agents/debate.scm"
+      - "experiments/025-debate/test-debate.scm"
+    success_criteria:
+      - "run-debate function with N rounds"
+      - "Produces structured transcript"
+
+  - id: "026-critic"
+    name: "Generator-Critic Pattern"
+    category: agents
+    difficulty: medium
+    priority: P2
+    inputs:
+      - "src/llm/core/prompts.scm"
+    outputs:
+      - "src/llm/agents/critic.scm"
+      - "experiments/026-critic/test-critic.scm"
+    success_criteria:
+      - "Generator -> Critic -> Refinement loop"
+      - "Configurable iterations"
+
+  - id: "027-ensemble"
+    name: "Multi-Model Ensemble"
+    category: agents
+    difficulty: medium
+    priority: P3
+    inputs:
+      - "src/llm/core/provider.scm"
+    outputs:
+      - "src/llm/agents/ensemble.scm"
+      - "experiments/027-ensemble/test-ensemble.scm"
+    success_criteria:
+      - "Query multiple providers"
+      - "Aggregate by voting"
+
+  # Formats
+  - id: "028-markdown"
+    name: "Markdown Extraction"
+    category: formats
+    difficulty: easy
+    priority: P2
+    inputs: []
+    outputs:
+      - "src/llm/formats/markdown.scm"
+      - "experiments/028-markdown/test-markdown.scm"
+    success_criteria:
+      - "extract-code-blocks function"
+      - "extract-headers function"
+
+  - id: "029-json-repair"
+    name: "JSON Repair"
+    category: formats
+    difficulty: medium
+    priority: P2
+    inputs:
+      - "src/llm/utils/json.scm"
+    outputs:
+      - "src/llm/formats/json-repair.scm"
+      - "experiments/029-json-repair/test-repair.scm"
+    success_criteria:
+      - "Fixes unclosed brackets"
+      - "Fixes trailing commas"
+
+  - id: "030-xml"
+    name: "XML/HTML Parsing"
+    category: formats
+    difficulty: medium
+    priority: P3
+    inputs: []
+    outputs:
+      - "src/llm/formats/xml.scm"
+      - "experiments/030-xml/test-xml.scm"
+    success_criteria:
+      - "parse-xml function"
+      - "extract-by-tag function"
+
+  # Performance
+  - id: "031-batching"
+    name: "Request Batching"
+    category: perf
+    difficulty: medium
+    priority: P3
+    inputs:
+      - "src/llm/utils/http.scm"
+    outputs:
+      - "src/llm/perf/batching.scm"
+      - "experiments/031-batching/test-batching.scm"
+
+  - id: "032-caching"
+    name: "Response Caching"
+    category: perf
+    difficulty: easy
+    priority: P2
+    inputs: []
+    outputs:
+      - "src/llm/perf/cache.scm"
+      - "experiments/032-caching/test-cache.scm"
+    success_criteria:
+      - "cache-get/cache-set functions"
+      - "File-based persistence"
+      - "TTL support"
+
+  - id: "033-tokens"
+    name: "Token Counting"
+    category: perf
+    difficulty: medium
+    priority: P2
+    inputs:
+      - "src/llm/core/compaction.scm"
+    outputs:
+      - "src/llm/perf/tokenizer.scm"
+      - "experiments/033-tokens/test-tokens.scm"
+    success_criteria:
+      - "More accurate than 4 chars/token"
+      - "cl100k approximation"
+
+  # Formal Methods
+  - id: "034-generators"
+    name: "Contract Generators"
+    category: formal
+    difficulty: hard
+    priority: P3
+    inputs:
+      - "src/llm/core/contracts.scm"
+    outputs:
+      - "src/llm/contracts/generators.scm"
+      - "experiments/034-generators/test-generators.scm"
+    success_criteria:
+      - "generate-from-contract function"
+      - "QuickCheck-style shrinking"
+
+  - id: "035-tlaplus"
+    name: "TLA+ Generation"
+    category: formal
+    difficulty: hard
+    priority: P3
+    inputs:
+      - "src/llm/core/contracts.scm"
+      - "docs/formal-specification.md"
+    outputs:
+      - "src/llm/formal/tlaplus.scm"
+      - "experiments/035-tlaplus/provider.tla"
+
+# Agent recommendations
+agent_assignments:
+  claude:
+    strengths: ["complex reasoning", "code review", "formal methods"]
+    recommended: ["025-debate", "034-generators", "035-tlaplus", "021-factuality"]
+
+  gemini:
+    strengths: ["provider implementation", "multi-modal", "google apis"]
+    recommended: ["013-gemini", "022-embeddings", "027-ensemble"]
+
+  gpt4:
+    strengths: ["general implementation", "documentation", "refactoring"]
+    recommended: ["016-chain-of-thought", "017-few-shot", "028-markdown"]
+
+  local_models:
+    strengths: ["simple tasks", "testing", "utilities"]
+    recommended: ["023-chunking", "032-caching", "028-markdown"]
