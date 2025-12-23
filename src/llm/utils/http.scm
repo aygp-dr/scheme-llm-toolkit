@@ -15,6 +15,9 @@
             http-stream
             check-url-accessible
             with-http-error-handling
+            with-retry
+            make-retry-config
+            retryable-error?
             make-temp-file
             cleanup-temp-file))
 
@@ -24,7 +27,118 @@
 ;;; The implementation uses temporary files to avoid shell escaping issues
 ;;; and provides robust error handling.
 ;;;
+;;; Includes exponential backoff retry logic for transient failures.
+;;;
 ;;; Code:
+
+;;; --------------------------------------------------------------------
+;;; Retry Logic with Exponential Backoff
+;;; --------------------------------------------------------------------
+
+(define* (make-retry-config #:key
+                            (max-retries 3)
+                            (initial-delay 1.0)
+                            (max-delay 30.0)
+                            (backoff-multiplier 2.0)
+                            (jitter? #t))
+  "Create a retry configuration.
+
+   Parameters:
+   - max-retries: Maximum number of retry attempts (default: 3)
+   - initial-delay: Initial delay in seconds (default: 1.0)
+   - max-delay: Maximum delay cap in seconds (default: 30.0)
+   - backoff-multiplier: Multiplier for exponential growth (default: 2.0)
+   - jitter?: Add random jitter to prevent thundering herd (default: #t)"
+  (list (cons 'max-retries max-retries)
+        (cons 'initial-delay initial-delay)
+        (cons 'max-delay max-delay)
+        (cons 'backoff-multiplier backoff-multiplier)
+        (cons 'jitter? jitter?)))
+
+(define *default-retry-config*
+  (make-retry-config))
+
+(define (calculate-delay config attempt)
+  "Calculate delay for given attempt number using exponential backoff.
+
+   Formula: min(max-delay, initial-delay * (multiplier ^ attempt))
+   With optional jitter: delay * (0.5 + random(0.5))"
+  (let* ((initial (assoc-ref config 'initial-delay))
+         (max-d (assoc-ref config 'max-delay))
+         (multiplier (assoc-ref config 'backoff-multiplier))
+         (jitter? (assoc-ref config 'jitter?))
+         (base-delay (min max-d
+                         (* initial (expt multiplier attempt))))
+         (jitter-factor (if jitter?
+                           (+ 0.5 (* 0.5 (/ (random 1000) 1000.0)))
+                           1.0)))
+    (* base-delay jitter-factor)))
+
+(define (retryable-error? error-info)
+  "Check if an error is retryable based on HTTP status code.
+
+   Retryable errors:
+   - 429 Too Many Requests (rate limiting)
+   - 500 Internal Server Error
+   - 502 Bad Gateway
+   - 503 Service Unavailable
+   - 504 Gateway Timeout"
+  (cond
+   ((number? error-info)
+    (or (= error-info 429)
+        (>= error-info 500)))
+   ((string? error-info)
+    (or (string-contains error-info "429")
+        (string-contains error-info "500")
+        (string-contains error-info "502")
+        (string-contains error-info "503")
+        (string-contains error-info "504")
+        (string-contains error-info "rate limit")
+        (string-contains error-info "timeout")
+        (string-contains error-info "temporarily unavailable")))
+   (else #f)))
+
+(define (sleep-seconds seconds)
+  "Sleep for the specified number of seconds (supports fractional)."
+  (usleep (inexact->exact (floor (* seconds 1000000)))))
+
+(define* (with-retry thunk #:key
+                     (config #f)
+                     (on-retry #f)
+                     (should-retry? retryable-error?))
+  "Execute thunk with retry logic on transient failures.
+
+   Parameters:
+   - thunk: Zero-argument procedure to execute
+   - config: Retry configuration (default: *default-retry-config*)
+   - on-retry: Optional callback (lambda (attempt delay error) ...)
+   - should-retry?: Predicate to determine if error is retryable
+
+   Returns the result of thunk on success.
+   Throws the last error after all retries exhausted."
+  (let* ((cfg (or config *default-retry-config*))
+         (max-retries (assoc-ref cfg 'max-retries)))
+
+    (let retry-loop ((attempt 0)
+                     (last-error #f))
+      (catch #t
+        (lambda ()
+          (thunk))
+        (lambda (key . args)
+          (let* ((error-msg (if (pair? args)
+                               (format #f "~a" (car args))
+                               (format #f "~a" key)))
+                 (is-retryable (should-retry? error-msg)))
+
+            (if (and is-retryable (< attempt max-retries))
+                ;; Retry
+                (let ((delay (calculate-delay cfg attempt)))
+                  (when on-retry
+                    (on-retry attempt delay error-msg))
+                  (sleep-seconds delay)
+                  (retry-loop (+ attempt 1) (cons key args)))
+                ;; Give up - re-throw last error
+                (apply throw key args))))))))
 
 (define (make-temp-file prefix)
   "Create a temporary file with given prefix."
