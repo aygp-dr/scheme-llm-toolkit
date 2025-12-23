@@ -40,8 +40,16 @@ echo "Configuring..."
 echo "Building..."
 gmake
 
-echo "Installing (requires root)..."
-sudo gmake install
+echo ""
+echo "Build complete. Installing (requires root)..."
+echo "If prompted for password, enter your sudo password."
+echo ""
+sudo gmake install || {
+    echo ""
+    echo "ERROR: Install failed. Try running manually:"
+    echo "  cd $(pwd) && sudo gmake install"
+    exit 1
+}
 
 # Clean up
 cd /
