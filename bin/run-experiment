@@ -1,0 +1,71 @@
+#!/bin/sh
+# run-experiment - Run an experiment script with proper Guile setup
+# Usage: run-experiment <experiment-number-or-name> [script-name]
+#
+# Examples:
+#   run-experiment 008                    # Runs experiments/008-*/test-*.scm
+#   run-experiment contracts              # Runs experiments/*contracts*/test-*.scm
+#   run-experiment 006-anthropic demo.scm # Runs experiments/006-anthropic-test/demo.scm
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Source the guile finder
+GUILE=$("$SCRIPT_DIR/guile-llm" -c "(display \"found\")" >/dev/null 2>&1 && echo "$SCRIPT_DIR/guile-llm" || echo "")
+
+if [ -z "$GUILE" ]; then
+    echo "Error: Could not find Guile 3.x" >&2
+    exit 1
+fi
+
+usage() {
+    echo "Usage: run-experiment <experiment-id> [script-name]"
+    echo ""
+    echo "Examples:"
+    echo "  run-experiment 008              # Run test script in experiment 008"
+    echo "  run-experiment contracts        # Run test script matching 'contracts'"
+    echo "  run-experiment 006 demo.scm     # Run specific script"
+    echo ""
+    echo "Available experiments:"
+    ls -1 "$PROJECT_ROOT/experiments" | grep -E "^[0-9]+" | head -10
+    exit 1
+}
+
+if [ $# -lt 1 ]; then
+    usage
+fi
+
+PATTERN="$1"
+SCRIPT_NAME="${2:-test-*.scm}"
+
+# Find matching experiment directory
+EXP_DIR=$(find "$PROJECT_ROOT/experiments" -maxdepth 1 -type d -name "*${PATTERN}*" | head -1)
+
+if [ -z "$EXP_DIR" ] || [ ! -d "$EXP_DIR" ]; then
+    echo "Error: No experiment matching '$PATTERN' found" >&2
+    echo ""
+    echo "Available experiments:"
+    ls -1 "$PROJECT_ROOT/experiments" | grep -E "^[0-9]+"
+    exit 1
+fi
+
+# Find script to run
+if [ -f "$EXP_DIR/$SCRIPT_NAME" ]; then
+    SCRIPT="$EXP_DIR/$SCRIPT_NAME"
+else
+    SCRIPT=$(find "$EXP_DIR" -name "$SCRIPT_NAME" -type f | head -1)
+fi
+
+if [ -z "$SCRIPT" ] || [ ! -f "$SCRIPT" ]; then
+    echo "Error: No script matching '$SCRIPT_NAME' in $EXP_DIR" >&2
+    echo ""
+    echo "Available scripts:"
+    ls -1 "$EXP_DIR"/*.scm 2>/dev/null
+    exit 1
+fi
+
+echo "Running: $SCRIPT"
+echo "Using: $("$SCRIPT_DIR/guile-llm" --version | head -1)"
+echo ""
+
+exec "$SCRIPT_DIR/guile-llm" -e main -s "$SCRIPT"

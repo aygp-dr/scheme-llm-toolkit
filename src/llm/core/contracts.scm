@@ -16,6 +16,7 @@
             contract-check
             contract-generate
             contract-first-order?
+            contract-projection
 
             ;; Flat contracts (predicates)
             flat-contract
@@ -47,15 +48,27 @@
             define/contract
             λ/contract
 
-            ;; Standard predicates for LLM domain
+            ;; Basic type contracts
+            string/c
+            symbol/c
+            number/c
+            boolean/c
+            procedure/c
+            list/c
+            any/c
+
+            ;; LLM domain contracts
             provider?/c
             message?/c
+            messages/c
             tool?/c
             response?/c
+            role/c
 
             ;; OpenAPI-style schema contracts
             schema->contract
-            json-schema/c))
+            json-schema/c
+            provider-interface/c))
 
 ;;; Commentary:
 ;;;
@@ -137,7 +150,7 @@
 ;;;; Flat Contracts (First-Order Predicates)
 ;;;; ============================================================
 
-(define (flat-contract pred #:name (name #f))
+(define* (flat-contract pred #:key (name #f))
   "Create a flat contract from a predicate."
   (make-contract-internal
    (or name (format #f "~a" pred))
@@ -536,15 +549,14 @@
 ;;; This defines the INTERFACE CONTRACT that all providers must satisfy.
 ;;; Inspired by TLA+ specification of interfaces.
 
+;; Contract specifying the provider interface.
+;;
+;; INVARIANTS (TLA+ style):
+;; - provider-name always returns a symbol
+;; - provider-complete returns string or structured response
+;; - provider-chat accepts message list, returns response
+;; - provider-capabilities returns list of known capability symbols
 (define provider-interface/c
-  "Contract specifying the provider interface.
-
-   INVARIANTS (TLA+ style):
-   - provider-name always returns a symbol
-   - provider-complete returns string or structured response
-   - provider-chat accepts message list, returns response
-   - provider-capabilities returns list of known capability symbols"
-
   (alist/c
    #:required
    `((name . ,symbol/c)

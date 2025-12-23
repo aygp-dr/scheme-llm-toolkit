@@ -1,0 +1,60 @@
+#!/bin/sh
+# guile-llm - Portable Guile 3.x wrapper for scheme-llm-toolkit
+# Finds the correct Guile 3.x binary on FreeBSD, Linux, and macOS
+
+# Find the project root (directory containing this script's parent)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Find Guile 3.x
+find_guile3() {
+    # Try guile3 first (FreeBSD naming)
+    if command -v guile3 >/dev/null 2>&1; then
+        echo "guile3"
+        return 0
+    fi
+
+    # Try guile and check version
+    if command -v guile >/dev/null 2>&1; then
+        VERSION=$(guile -c "(display (major-version))" 2>/dev/null)
+        if [ "$VERSION" = "3" ]; then
+            echo "guile"
+            return 0
+        fi
+    fi
+
+    # Try common paths
+    for path in /usr/local/bin/guile3 /usr/bin/guile3 /opt/homebrew/bin/guile; do
+        if [ -x "$path" ]; then
+            VERSION=$("$path" -c "(display (major-version))" 2>/dev/null)
+            if [ "$VERSION" = "3" ]; then
+                echo "$path"
+                return 0
+            fi
+        fi
+    done
+
+    return 1
+}
+
+GUILE=$(find_guile3)
+
+if [ -z "$GUILE" ]; then
+    echo "Error: Guile 3.x not found." >&2
+    echo "" >&2
+    case "$(uname -s)" in
+        FreeBSD)
+            echo "Install with: pkg install guile3" >&2
+            ;;
+        Darwin)
+            echo "Install with: brew install guile" >&2
+            ;;
+        *)
+            echo "Install with: apt install guile-3.0" >&2
+            ;;
+    esac
+    exit 1
+fi
+
+# Run guile with project source path
+exec "$GUILE" -L "$PROJECT_ROOT/src" "$@"
