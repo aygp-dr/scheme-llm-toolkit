@@ -1,25 +1,120 @@
-# Agent Task Configuration
+# Agent Task Configuration with PERT Estimation and Risk Model
 # Machine-readable task definitions for AI agents
 
 metadata:
   project: scheme-llm-toolkit
   language: guile-scheme
   test_command: "guile3 -L src {test_file}"
+  version: "2.0"
+
+# Estimation Model
+# ================
+# effort: PERT three-point estimate in story points (1 SP ≈ 1 hour focused work)
+#   - optimistic: best case, everything goes right
+#   - likely: most probable duration
+#   - pessimistic: worst case, significant blockers
+#   - expected: (O + 4L + P) / 6  (calculated)
+#   - stddev: (P - O) / 6  (calculated)
+#
+# confidence: probability agent completes successfully (0.0-1.0)
+#   - 0.9+ : trivial, well-understood task
+#   - 0.7-0.9: moderate complexity, some unknowns
+#   - 0.5-0.7: significant unknowns or novel work
+#   - <0.5: research/exploration, high uncertainty
+#
+# cost_estimate: approximate token/API cost
+#   - input_tokens: estimated input context
+#   - output_tokens: estimated generated output
+#   - api_calls: number of LLM API calls for testing
+#
+# risk_factors: what could cause delays/failure
+#   - technical: implementation complexity
+#   - external: API changes, rate limits, auth issues
+#   - knowledge: unfamiliar domain or patterns
+#   - integration: dependencies on other components
+
+estimation_defaults:
+  # Default agent confidence by task category
+  category_confidence:
+    providers: 0.75      # API integration is predictable but has auth/rate issues
+    prompts: 0.85        # Prompt engineering is well-understood
+    eval: 0.70           # Evaluation metrics can be subjective
+    rag: 0.65            # RAG involves multiple moving parts
+    agents: 0.55         # Multi-agent is experimental
+    formats: 0.80        # Parsing is deterministic
+    perf: 0.70           # Performance work can have surprises
+    formal: 0.50         # Formal methods are specialized
+
+  # Cost per 1K tokens (USD) - for budgeting
+  token_costs:
+    claude-opus: { input: 0.015, output: 0.075 }
+    claude-sonnet: { input: 0.003, output: 0.015 }
+    gpt-4: { input: 0.03, output: 0.06 }
+    gemini-pro: { input: 0.00025, output: 0.0005 }
+    local: { input: 0, output: 0 }
 
 tasks:
+  # ==========================================================================
   # Provider Implementations
+  # ==========================================================================
+
   - id: "013-gemini"
     name: "Google Gemini Provider"
     category: providers
-    difficulty: medium
     priority: P2
+
+    # PERT Estimation
+    effort:
+      optimistic: 2      # Know the pattern from OpenAI
+      likely: 4          # Some API quirks to handle
+      pessimistic: 8     # Auth/quota issues, API changes
+
+    # Agent Confidence Scores (0-1)
+    agent_confidence:
+      claude: 0.80       # Strong at API integration
+      gemini: 0.90       # Best for its own API
+      gpt4: 0.75         # Good general capability
+      local: 0.40        # May struggle with auth flow
+
+    # Cost Estimate
+    cost_estimate:
+      input_tokens: 15000    # Reading docs, existing code
+      output_tokens: 5000    # Generated implementation
+      api_calls: 20          # Testing the provider
+      estimated_usd: 0.50    # Using claude-sonnet
+
+    # Risk Assessment
+    risk_factors:
+      - type: external
+        description: "Gemini API may have breaking changes"
+        probability: 0.2
+        impact: high
+        mitigation: "Pin to specific API version"
+      - type: external
+        description: "Rate limiting during testing"
+        probability: 0.4
+        impact: medium
+        mitigation: "Use exponential backoff, cache responses"
+      - type: technical
+        description: "Streaming response format differs"
+        probability: 0.3
+        impact: low
+        mitigation: "Reference existing streaming impl"
+
+    # Dependencies
+    dependencies:
+      hard: []  # Must complete first
+      soft:     # Helpful but not required
+        - "src/llm/utils/http.scm"
+        - "src/llm/core/provider.scm"
+
+    # Standard fields
     inputs:
       - "src/llm/providers/openai.scm"
       - "src/llm/providers/anthropic.scm"
       - "src/llm/core/provider.scm"
     outputs:
       - "src/llm/providers/gemini.scm"
-      - "src/llm/providers/gemini-provider.scm"
       - "experiments/013-gemini-test/test-gemini.scm"
     env_vars:
       - "GEMINI_API_KEY"
@@ -33,8 +128,41 @@ tasks:
   - id: "014-huggingface"
     name: "Hugging Face Inference Provider"
     category: providers
-    difficulty: medium
     priority: P2
+
+    effort:
+      optimistic: 3
+      likely: 5
+      pessimistic: 10
+
+    agent_confidence:
+      claude: 0.75
+      gemini: 0.70
+      gpt4: 0.80       # Good HF documentation understanding
+      local: 0.50
+
+    cost_estimate:
+      input_tokens: 20000
+      output_tokens: 6000
+      api_calls: 30
+      estimated_usd: 0.60
+
+    risk_factors:
+      - type: external
+        description: "HF model availability varies"
+        probability: 0.3
+        impact: medium
+        mitigation: "Test with popular, stable models"
+      - type: technical
+        description: "Multiple endpoint types (inference, dedicated)"
+        probability: 0.4
+        impact: medium
+        mitigation: "Start with free inference API"
+
+    dependencies:
+      hard: []
+      soft: ["src/llm/core/provider.scm"]
+
     inputs:
       - "src/llm/providers/openai.scm"
       - "src/llm/core/provider.scm"
@@ -51,8 +179,35 @@ tasks:
   - id: "015-cohere"
     name: "Cohere Provider"
     category: providers
-    difficulty: medium
     priority: P3
+
+    effort:
+      optimistic: 2
+      likely: 4
+      pessimistic: 7
+
+    agent_confidence:
+      claude: 0.80
+      gemini: 0.75
+      gpt4: 0.80
+      local: 0.45
+
+    cost_estimate:
+      input_tokens: 12000
+      output_tokens: 4000
+      api_calls: 15
+      estimated_usd: 0.35
+
+    risk_factors:
+      - type: external
+        description: "Cohere API versioning"
+        probability: 0.2
+        impact: low
+
+    dependencies:
+      hard: []
+      soft: ["src/llm/providers/openai.scm"]
+
     inputs:
       - "src/llm/providers/openai.scm"
     outputs:
@@ -62,12 +217,43 @@ tasks:
       - "COHERE_API_KEY"
     api_docs: "https://docs.cohere.com/reference/"
 
+  # ==========================================================================
   # Prompt Engineering
+  # ==========================================================================
+
   - id: "016-chain-of-thought"
     name: "Chain-of-Thought Prompting"
     category: prompts
-    difficulty: easy
     priority: P2
+
+    effort:
+      optimistic: 1
+      likely: 2
+      pessimistic: 4
+
+    agent_confidence:
+      claude: 0.95       # CoT is well-documented
+      gemini: 0.90
+      gpt4: 0.95
+      local: 0.70        # Can implement from examples
+
+    cost_estimate:
+      input_tokens: 5000
+      output_tokens: 2000
+      api_calls: 10
+      estimated_usd: 0.15
+
+    risk_factors:
+      - type: knowledge
+        description: "Choosing effective CoT patterns"
+        probability: 0.2
+        impact: low
+        mitigation: "Use established patterns from research"
+
+    dependencies:
+      hard: []
+      soft: ["src/llm/core/prompts.scm"]
+
     inputs:
       - "src/llm/core/prompts.scm"
     outputs:
@@ -82,8 +268,31 @@ tasks:
   - id: "017-few-shot"
     name: "Few-Shot Learning Templates"
     category: prompts
-    difficulty: easy
     priority: P2
+
+    effort:
+      optimistic: 1
+      likely: 2
+      pessimistic: 3
+
+    agent_confidence:
+      claude: 0.95
+      gemini: 0.90
+      gpt4: 0.95
+      local: 0.75
+
+    cost_estimate:
+      input_tokens: 4000
+      output_tokens: 1500
+      api_calls: 8
+      estimated_usd: 0.12
+
+    risk_factors: []
+
+    dependencies:
+      hard: []
+      soft: ["src/llm/core/prompts.scm"]
+
     inputs:
       - "src/llm/core/prompts.scm"
     outputs:
@@ -96,8 +305,42 @@ tasks:
   - id: "018-self-consistency"
     name: "Self-Consistency Sampling"
     category: prompts
-    difficulty: medium
     priority: P3
+
+    effort:
+      optimistic: 3
+      likely: 5
+      pessimistic: 10
+
+    agent_confidence:
+      claude: 0.80
+      gemini: 0.75
+      gpt4: 0.80
+      local: 0.50
+
+    cost_estimate:
+      input_tokens: 8000
+      output_tokens: 3000
+      api_calls: 50       # Multiple samples per test
+      estimated_usd: 1.00
+
+    risk_factors:
+      - type: technical
+        description: "Aggregation logic for diverse outputs"
+        probability: 0.3
+        impact: medium
+      - type: cost
+        description: "N samples per query multiplies cost"
+        probability: 1.0
+        impact: medium
+        mitigation: "Use small N for testing"
+
+    dependencies:
+      hard: []
+      soft:
+        - "src/llm/core/prompts.scm"
+        - "src/llm/core/provider.scm"
+
     inputs:
       - "src/llm/core/prompts.scm"
       - "src/llm/core/provider.scm"
@@ -109,12 +352,47 @@ tasks:
       - "majority-vote aggregation"
       - "Returns confidence score"
 
+  # ==========================================================================
   # Evaluation
+  # ==========================================================================
+
   - id: "019-quality-metrics"
     name: "Response Quality Evaluation"
     category: eval
-    difficulty: medium
     priority: P2
+
+    effort:
+      optimistic: 4
+      likely: 6
+      pessimistic: 12
+
+    agent_confidence:
+      claude: 0.75
+      gemini: 0.70
+      gpt4: 0.75
+      local: 0.40
+
+    cost_estimate:
+      input_tokens: 15000
+      output_tokens: 5000
+      api_calls: 25
+      estimated_usd: 0.55
+
+    risk_factors:
+      - type: knowledge
+        description: "Defining objective quality metrics"
+        probability: 0.5
+        impact: high
+        mitigation: "Start with established metrics (BLEU, coherence)"
+      - type: technical
+        description: "LLM-as-judge reliability"
+        probability: 0.4
+        impact: medium
+
+    dependencies:
+      hard: []
+      soft: ["src/llm/core/contracts.scm"]
+
     inputs:
       - "src/llm/core/contracts.scm"
     outputs:
@@ -128,8 +406,39 @@ tasks:
   - id: "020-toxicity"
     name: "Content Safety Detection"
     category: eval
-    difficulty: medium
     priority: P2
+
+    effort:
+      optimistic: 3
+      likely: 5
+      pessimistic: 9
+
+    agent_confidence:
+      claude: 0.85       # Strong at safety analysis
+      gemini: 0.80
+      gpt4: 0.80
+      local: 0.35        # Needs specialized model
+
+    cost_estimate:
+      input_tokens: 10000
+      output_tokens: 3000
+      api_calls: 30
+      estimated_usd: 0.40
+
+    risk_factors:
+      - type: knowledge
+        description: "Defining toxicity categories"
+        probability: 0.3
+        impact: medium
+      - type: external
+        description: "Need diverse test cases"
+        probability: 0.4
+        impact: low
+
+    dependencies:
+      hard: []
+      soft: ["src/llm/core/contracts.scm"]
+
     inputs:
       - "src/llm/core/contracts.scm"
     outputs:
@@ -142,8 +451,40 @@ tasks:
   - id: "021-factuality"
     name: "Factuality Grounding"
     category: eval
-    difficulty: hard
     priority: P3
+
+    effort:
+      optimistic: 6
+      likely: 10
+      pessimistic: 20
+
+    agent_confidence:
+      claude: 0.60
+      gemini: 0.55
+      gpt4: 0.60
+      local: 0.25
+
+    cost_estimate:
+      input_tokens: 25000
+      output_tokens: 8000
+      api_calls: 40
+      estimated_usd: 1.20
+
+    risk_factors:
+      - type: technical
+        description: "Claim extraction accuracy"
+        probability: 0.5
+        impact: high
+      - type: knowledge
+        description: "Grounding without knowledge base"
+        probability: 0.6
+        impact: high
+        mitigation: "Ground against provided context only"
+
+    dependencies:
+      hard: []
+      soft: ["src/llm/core/structured.scm"]
+
     inputs:
       - "src/llm/core/structured.scm"
     outputs:
@@ -153,12 +494,46 @@ tasks:
       - "extract-claims function"
       - "ground-against-context function"
 
-  # RAG
+  # ==========================================================================
+  # RAG (Retrieval Augmented Generation)
+  # ==========================================================================
+
   - id: "022-embeddings"
     name: "Embedding Similarity Search"
     category: rag
-    difficulty: medium
     priority: P2
+
+    effort:
+      optimistic: 4
+      likely: 6
+      pessimistic: 12
+
+    agent_confidence:
+      claude: 0.70
+      gemini: 0.80       # Strong embedding API
+      gpt4: 0.75
+      local: 0.55
+
+    cost_estimate:
+      input_tokens: 20000
+      output_tokens: 5000
+      api_calls: 100      # Many embedding calls
+      estimated_usd: 0.30  # Embeddings are cheap
+
+    risk_factors:
+      - type: technical
+        description: "Vector similarity implementation"
+        probability: 0.3
+        impact: low
+      - type: external
+        description: "Embedding API availability"
+        probability: 0.2
+        impact: medium
+
+    dependencies:
+      hard: []
+      soft: []
+
     inputs: []
     outputs:
       - "src/llm/rag/embeddings.scm"
@@ -171,8 +546,35 @@ tasks:
   - id: "023-chunking"
     name: "Document Chunking"
     category: rag
-    difficulty: easy
     priority: P2
+
+    effort:
+      optimistic: 2
+      likely: 3
+      pessimistic: 5
+
+    agent_confidence:
+      claude: 0.90
+      gemini: 0.85
+      gpt4: 0.90
+      local: 0.80        # Deterministic string ops
+
+    cost_estimate:
+      input_tokens: 6000
+      output_tokens: 2500
+      api_calls: 0        # No LLM needed
+      estimated_usd: 0.15
+
+    risk_factors:
+      - type: technical
+        description: "Sentence boundary detection"
+        probability: 0.2
+        impact: low
+
+    dependencies:
+      hard: []
+      soft: []
+
     inputs: []
     outputs:
       - "src/llm/rag/chunking.scm"
@@ -185,8 +587,37 @@ tasks:
   - id: "024-context"
     name: "Context Window Packing"
     category: rag
-    difficulty: medium
     priority: P3
+
+    effort:
+      optimistic: 3
+      likely: 5
+      pessimistic: 9
+
+    agent_confidence:
+      claude: 0.80
+      gemini: 0.75
+      gpt4: 0.80
+      local: 0.60
+
+    cost_estimate:
+      input_tokens: 10000
+      output_tokens: 4000
+      api_calls: 10
+      estimated_usd: 0.35
+
+    risk_factors:
+      - type: technical
+        description: "Optimal packing algorithm"
+        probability: 0.3
+        impact: medium
+
+    dependencies:
+      hard:
+        - "023-chunking"
+      soft:
+        - "src/llm/core/compaction.scm"
+
     inputs:
       - "src/llm/core/compaction.scm"
     outputs:
@@ -196,12 +627,53 @@ tasks:
       - "pack-context fits chunks to token limit"
       - "Prioritizes by relevance"
 
-  # Multi-Agent
+  # ==========================================================================
+  # Multi-Agent Patterns
+  # ==========================================================================
+
   - id: "025-debate"
     name: "Multi-Agent Debate"
     category: agents
-    difficulty: hard
     priority: P3
+
+    effort:
+      optimistic: 6
+      likely: 10
+      pessimistic: 20
+
+    agent_confidence:
+      claude: 0.65
+      gemini: 0.55
+      gpt4: 0.60
+      local: 0.30
+
+    cost_estimate:
+      input_tokens: 50000
+      output_tokens: 20000
+      api_calls: 100      # Multiple rounds, multiple agents
+      estimated_usd: 3.00
+
+    risk_factors:
+      - type: technical
+        description: "Conversation state management"
+        probability: 0.4
+        impact: high
+      - type: knowledge
+        description: "Effective debate prompts"
+        probability: 0.5
+        impact: medium
+      - type: cost
+        description: "High token usage"
+        probability: 1.0
+        impact: medium
+        mitigation: "Use cheaper models for debate agents"
+
+    dependencies:
+      hard: []
+      soft:
+        - "src/llm/core/prompts.scm"
+        - "src/llm/core/provider.scm"
+
     inputs:
       - "src/llm/core/prompts.scm"
       - "src/llm/core/provider.scm"
@@ -215,8 +687,39 @@ tasks:
   - id: "026-critic"
     name: "Generator-Critic Pattern"
     category: agents
-    difficulty: medium
     priority: P2
+
+    effort:
+      optimistic: 4
+      likely: 6
+      pessimistic: 12
+
+    agent_confidence:
+      claude: 0.80
+      gemini: 0.70
+      gpt4: 0.80
+      local: 0.45
+
+    cost_estimate:
+      input_tokens: 25000
+      output_tokens: 10000
+      api_calls: 40
+      estimated_usd: 1.00
+
+    risk_factors:
+      - type: technical
+        description: "Critic feedback parsing"
+        probability: 0.3
+        impact: medium
+      - type: knowledge
+        description: "Effective critic prompts"
+        probability: 0.4
+        impact: medium
+
+    dependencies:
+      hard: []
+      soft: ["src/llm/core/prompts.scm"]
+
     inputs:
       - "src/llm/core/prompts.scm"
     outputs:
@@ -229,8 +732,39 @@ tasks:
   - id: "027-ensemble"
     name: "Multi-Model Ensemble"
     category: agents
-    difficulty: medium
     priority: P3
+
+    effort:
+      optimistic: 4
+      likely: 7
+      pessimistic: 14
+
+    agent_confidence:
+      claude: 0.75
+      gemini: 0.70
+      gpt4: 0.75
+      local: 0.35
+
+    cost_estimate:
+      input_tokens: 30000
+      output_tokens: 12000
+      api_calls: 60       # Multiple models per query
+      estimated_usd: 2.00
+
+    risk_factors:
+      - type: external
+        description: "Multiple API credentials needed"
+        probability: 0.5
+        impact: medium
+      - type: technical
+        description: "Response normalization across models"
+        probability: 0.4
+        impact: medium
+
+    dependencies:
+      hard: []
+      soft: ["src/llm/core/provider.scm"]
+
     inputs:
       - "src/llm/core/provider.scm"
     outputs:
@@ -240,12 +774,38 @@ tasks:
       - "Query multiple providers"
       - "Aggregate by voting"
 
-  # Formats
+  # ==========================================================================
+  # Format Handling
+  # ==========================================================================
+
   - id: "028-markdown"
     name: "Markdown Extraction"
     category: formats
-    difficulty: easy
     priority: P2
+
+    effort:
+      optimistic: 1
+      likely: 2
+      pessimistic: 4
+
+    agent_confidence:
+      claude: 0.95
+      gemini: 0.90
+      gpt4: 0.95
+      local: 0.85
+
+    cost_estimate:
+      input_tokens: 4000
+      output_tokens: 2000
+      api_calls: 0
+      estimated_usd: 0.10
+
+    risk_factors: []
+
+    dependencies:
+      hard: []
+      soft: []
+
     inputs: []
     outputs:
       - "src/llm/formats/markdown.scm"
@@ -257,8 +817,35 @@ tasks:
   - id: "029-json-repair"
     name: "JSON Repair"
     category: formats
-    difficulty: medium
     priority: P2
+
+    effort:
+      optimistic: 3
+      likely: 5
+      pessimistic: 10
+
+    agent_confidence:
+      claude: 0.85
+      gemini: 0.80
+      gpt4: 0.85
+      local: 0.65
+
+    cost_estimate:
+      input_tokens: 8000
+      output_tokens: 3000
+      api_calls: 0
+      estimated_usd: 0.20
+
+    risk_factors:
+      - type: technical
+        description: "Edge cases in malformed JSON"
+        probability: 0.4
+        impact: medium
+
+    dependencies:
+      hard: []
+      soft: ["src/llm/utils/json.scm"]
+
     inputs:
       - "src/llm/utils/json.scm"
     outputs:
@@ -271,8 +858,35 @@ tasks:
   - id: "030-xml"
     name: "XML/HTML Parsing"
     category: formats
-    difficulty: medium
     priority: P3
+
+    effort:
+      optimistic: 3
+      likely: 5
+      pessimistic: 9
+
+    agent_confidence:
+      claude: 0.80
+      gemini: 0.75
+      gpt4: 0.80
+      local: 0.70
+
+    cost_estimate:
+      input_tokens: 8000
+      output_tokens: 3500
+      api_calls: 0
+      estimated_usd: 0.20
+
+    risk_factors:
+      - type: technical
+        description: "Malformed HTML handling"
+        probability: 0.3
+        impact: low
+
+    dependencies:
+      hard: []
+      soft: []
+
     inputs: []
     outputs:
       - "src/llm/formats/xml.scm"
@@ -281,12 +895,46 @@ tasks:
       - "parse-xml function"
       - "extract-by-tag function"
 
+  # ==========================================================================
   # Performance
+  # ==========================================================================
+
   - id: "031-batching"
     name: "Request Batching"
     category: perf
-    difficulty: medium
     priority: P3
+
+    effort:
+      optimistic: 4
+      likely: 6
+      pessimistic: 12
+
+    agent_confidence:
+      claude: 0.70
+      gemini: 0.65
+      gpt4: 0.70
+      local: 0.50
+
+    cost_estimate:
+      input_tokens: 12000
+      output_tokens: 5000
+      api_calls: 50
+      estimated_usd: 0.45
+
+    risk_factors:
+      - type: external
+        description: "API batch support varies"
+        probability: 0.5
+        impact: high
+      - type: technical
+        description: "Async coordination"
+        probability: 0.4
+        impact: medium
+
+    dependencies:
+      hard: []
+      soft: ["src/llm/utils/http.scm"]
+
     inputs:
       - "src/llm/utils/http.scm"
     outputs:
@@ -296,8 +944,35 @@ tasks:
   - id: "032-caching"
     name: "Response Caching"
     category: perf
-    difficulty: easy
     priority: P2
+
+    effort:
+      optimistic: 2
+      likely: 3
+      pessimistic: 6
+
+    agent_confidence:
+      claude: 0.90
+      gemini: 0.85
+      gpt4: 0.90
+      local: 0.80
+
+    cost_estimate:
+      input_tokens: 5000
+      output_tokens: 2500
+      api_calls: 0
+      estimated_usd: 0.12
+
+    risk_factors:
+      - type: technical
+        description: "Cache invalidation strategy"
+        probability: 0.2
+        impact: low
+
+    dependencies:
+      hard: []
+      soft: []
+
     inputs: []
     outputs:
       - "src/llm/perf/cache.scm"
@@ -310,8 +985,36 @@ tasks:
   - id: "033-tokens"
     name: "Token Counting"
     category: perf
-    difficulty: medium
     priority: P2
+
+    effort:
+      optimistic: 3
+      likely: 5
+      pessimistic: 10
+
+    agent_confidence:
+      claude: 0.75
+      gemini: 0.70
+      gpt4: 0.80       # Good tiktoken knowledge
+      local: 0.55
+
+    cost_estimate:
+      input_tokens: 10000
+      output_tokens: 4000
+      api_calls: 20
+      estimated_usd: 0.35
+
+    risk_factors:
+      - type: technical
+        description: "Tokenizer implementation complexity"
+        probability: 0.5
+        impact: medium
+        mitigation: "Use approximation, not exact BPE"
+
+    dependencies:
+      hard: []
+      soft: ["src/llm/core/compaction.scm"]
+
     inputs:
       - "src/llm/core/compaction.scm"
     outputs:
@@ -321,12 +1024,46 @@ tasks:
       - "More accurate than 4 chars/token"
       - "cl100k approximation"
 
+  # ==========================================================================
   # Formal Methods
+  # ==========================================================================
+
   - id: "034-generators"
     name: "Contract Generators"
     category: formal
-    difficulty: hard
     priority: P3
+
+    effort:
+      optimistic: 6
+      likely: 12
+      pessimistic: 24
+
+    agent_confidence:
+      claude: 0.55
+      gemini: 0.45
+      gpt4: 0.50
+      local: 0.20
+
+    cost_estimate:
+      input_tokens: 30000
+      output_tokens: 12000
+      api_calls: 30
+      estimated_usd: 1.50
+
+    risk_factors:
+      - type: knowledge
+        description: "Property-based testing expertise"
+        probability: 0.6
+        impact: high
+      - type: technical
+        description: "Shrinking implementation"
+        probability: 0.5
+        impact: high
+
+    dependencies:
+      hard: []
+      soft: ["src/llm/core/contracts.scm"]
+
     inputs:
       - "src/llm/core/contracts.scm"
     outputs:
@@ -339,8 +1076,42 @@ tasks:
   - id: "035-tlaplus"
     name: "TLA+ Generation"
     category: formal
-    difficulty: hard
     priority: P3
+
+    effort:
+      optimistic: 8
+      likely: 15
+      pessimistic: 30
+
+    agent_confidence:
+      claude: 0.45       # TLA+ is specialized
+      gemini: 0.35
+      gpt4: 0.50
+      local: 0.10
+
+    cost_estimate:
+      input_tokens: 40000
+      output_tokens: 15000
+      api_calls: 20
+      estimated_usd: 2.00
+
+    risk_factors:
+      - type: knowledge
+        description: "TLA+ syntax and semantics"
+        probability: 0.7
+        impact: high
+        mitigation: "Provide TLA+ examples in context"
+      - type: technical
+        description: "Mapping Scheme types to TLA+"
+        probability: 0.6
+        impact: high
+
+    dependencies:
+      hard: []
+      soft:
+        - "src/llm/core/contracts.scm"
+        - "docs/formal-specification.md"
+
     inputs:
       - "src/llm/core/contracts.scm"
       - "docs/formal-specification.md"
@@ -348,20 +1119,122 @@ tasks:
       - "src/llm/formal/tlaplus.scm"
       - "experiments/035-tlaplus/provider.tla"
 
-# Agent recommendations
+# ==========================================================================
+# Agent Assignment Recommendations
+# ==========================================================================
+# Based on confidence scores and task characteristics
+
 agent_assignments:
   claude:
-    strengths: ["complex reasoning", "code review", "formal methods"]
-    recommended: ["025-debate", "034-generators", "035-tlaplus", "021-factuality"]
+    strengths:
+      - "complex reasoning"
+      - "code review"
+      - "formal methods"
+      - "safety analysis"
+    recommended:
+      high_confidence:  # >0.8
+        - "016-chain-of-thought"
+        - "017-few-shot"
+        - "020-toxicity"
+        - "028-markdown"
+        - "032-caching"
+      medium_confidence:  # 0.6-0.8
+        - "013-gemini"
+        - "019-quality-metrics"
+        - "026-critic"
+      stretch:  # <0.6, needs support
+        - "034-generators"
+        - "035-tlaplus"
 
   gemini:
-    strengths: ["provider implementation", "multi-modal", "google apis"]
-    recommended: ["013-gemini", "022-embeddings", "027-ensemble"]
+    strengths:
+      - "google api integration"
+      - "embeddings"
+      - "multi-modal"
+    recommended:
+      high_confidence:
+        - "013-gemini"    # Self-knowledge advantage
+        - "016-chain-of-thought"
+      medium_confidence:
+        - "022-embeddings"
+        - "023-chunking"
+      avoid:
+        - "035-tlaplus"   # Low confidence
 
   gpt4:
-    strengths: ["general implementation", "documentation", "refactoring"]
-    recommended: ["016-chain-of-thought", "017-few-shot", "028-markdown"]
+    strengths:
+      - "general implementation"
+      - "documentation understanding"
+      - "code generation"
+    recommended:
+      high_confidence:
+        - "016-chain-of-thought"
+        - "017-few-shot"
+        - "028-markdown"
+      medium_confidence:
+        - "014-huggingface"
+        - "033-tokens"
 
   local_models:
-    strengths: ["simple tasks", "testing", "utilities"]
-    recommended: ["023-chunking", "032-caching", "028-markdown"]
+    strengths:
+      - "simple deterministic tasks"
+      - "no API cost"
+      - "privacy-sensitive work"
+    recommended:
+      high_confidence:
+        - "023-chunking"
+        - "028-markdown"
+      suitable:
+        - "032-caching"
+        - "017-few-shot"
+    avoid:  # Confidence too low
+      - "025-debate"
+      - "034-generators"
+      - "035-tlaplus"
+
+# ==========================================================================
+# Portfolio Optimization
+# ==========================================================================
+# Suggested task ordering by value/risk ratio
+
+execution_strategy:
+  phase_1_quick_wins:  # High confidence, low effort
+    description: "Build momentum with reliable wins"
+    tasks:
+      - "016-chain-of-thought"
+      - "017-few-shot"
+      - "023-chunking"
+      - "028-markdown"
+    total_expected_effort: 9
+    combined_confidence: 0.92
+
+  phase_2_core_capabilities:  # Medium effort, good ROI
+    description: "Essential infrastructure"
+    tasks:
+      - "013-gemini"
+      - "032-caching"
+      - "029-json-repair"
+      - "020-toxicity"
+    total_expected_effort: 18
+    combined_confidence: 0.82
+
+  phase_3_advanced_features:  # Higher complexity
+    description: "Differentiation features"
+    tasks:
+      - "022-embeddings"
+      - "026-critic"
+      - "019-quality-metrics"
+      - "033-tokens"
+    total_expected_effort: 23
+    combined_confidence: 0.75
+
+  phase_4_research:  # High uncertainty, potential high value
+    description: "Experimental capabilities"
+    tasks:
+      - "025-debate"
+      - "021-factuality"
+      - "034-generators"
+      - "035-tlaplus"
+    total_expected_effort: 47
+    combined_confidence: 0.52
+    recommendation: "Consider as stretch goals or research spikes"
