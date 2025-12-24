@@ -3,13 +3,28 @@
 ;; Copyright (C) 2025 aygp-dr
 ;; Licensed under MIT License
 
+;;; Commentary:
+;;;
+;;; This module provides HTTP client utilities using curl subprocess.
+;;;
+;;; On FreeBSD 14 with Guile 3.0.10, the ice-9 popen module causes
+;;; segfaults due to bug #79494 (incompatible gnulib posix_spawn with
+;;; FreeBSD's posix_spawn_file_actions_addclosefrom_np).
+;;;
+;;; This module uses (llm utils subprocess) which works around the bug
+;;; by using primitive-fork + execl directly.
+;;;
+;;; See: https://codeberg.org/guile/guile/pulls/17
+;;;
+;;; Code:
+
 (define-module (llm utils http)
-  #:use-module (ice-9 popen)
   #:use-module (ice-9 rdelim)
   #:use-module (ice-9 textual-ports)
   #:use-module (ice-9 regex)
   #:use-module (srfi srfi-1)
   #:use-module (llm utils json)
+  #:use-module (llm utils subprocess)
   #:export (http-post
             http-get
             http-stream
@@ -20,16 +35,6 @@
             retryable-error?
             make-temp-file
             cleanup-temp-file))
-
-;;; Commentary:
-;;;
-;;; This module provides HTTP client utilities using curl subprocess.
-;;; The implementation uses temporary files to avoid shell escaping issues
-;;; and provides robust error handling.
-;;;
-;;; Includes exponential backoff retry logic for transient failures.
-;;;
-;;; Code:
 
 ;;; --------------------------------------------------------------------
 ;;; Retry Logic with Exponential Backoff
@@ -199,15 +204,13 @@
      " ")))
 
 (define (execute-curl-command cmd)
-  "Execute curl command and return response."
-  (let* ((port (open-pipe* OPEN_READ "/bin/sh" "-c" cmd))
-         (response (get-string-all port))
-         (status (close-pipe port)))
-    (if (zero? (status:exit-val status))
-        response
-        (throw 'http-error 
-               (format #f "HTTP request failed with status ~a" 
-                       (status:exit-val status))))))
+  "Execute curl command and return response.
+   Uses safe-pipe-command to avoid FreeBSD 14 popen segfault."
+  (let ((response (safe-pipe-command cmd)))
+    ;; safe-pipe-command returns empty string on failure
+    (if (string-null? response)
+        (throw 'http-error "HTTP request failed (empty response)")
+        response)))
 
 (define (http-post url data . options)
   "Make HTTP POST request with JSON data.
@@ -273,19 +276,21 @@
           (json->scm response)
           response))))
 
-(define* (http-stream url data on-chunk #:key 
+(define* (http-stream url data on-chunk #:key
                      (headers '())
                      (method "POST")
                      (timeout 300))
   "Stream HTTP response, calling on-chunk for each line.
-   
-   The on-chunk procedure receives each line of the response."
-  
+
+   The on-chunk procedure receives each line of the response.
+   Note: On FreeBSD, response is buffered then processed line-by-line
+   to avoid popen segfaults."
+
   (let ((temp-file (make-temp-file "http-stream"))
         (json-data (if (string? data)
                       data
                       (scm->json-string data))))
-    
+
     (dynamic-wind
       (lambda ()
         ;; Write data to temp file
@@ -293,54 +298,46 @@
           (call-with-output-file temp-file
             (lambda (port)
               (display json-data port)))))
-      
+
       (lambda ()
-        (let* ((headers-with-content-type 
+        (let* ((headers-with-content-type
                 (if (and (string=? method "POST")
                          (not (assoc-ref headers "Content-Type")))
                     (cons '("Content-Type" . "application/json") headers)
                     headers))
-               (cmd (build-curl-command 
+               (cmd (build-curl-command
                      method url
                      'headers headers-with-content-type
                      'data-file (if json-data temp-file #f)
                      'timeout timeout
                      'streaming #t))
-               (port (open-pipe* OPEN_READ "/bin/sh" "-c" cmd)))
-          
-          ;; Read streaming response line by line
-          (let loop ()
-            (let ((line (read-line port)))
-              (unless (eof-object? line)
-                (catch #t
-                  (lambda ()
-                    (unless (string-null? line)
-                      (on-chunk line)))
-                  (lambda (key . args)
-                    ;; Log error but continue streaming
-                    (format (current-error-port) 
-                            "Error processing chunk: ~a\n" key)))
-                (loop))))
-          
-          (let ((status (close-pipe port)))
-            (unless (zero? (status:exit-val status))
-              (throw 'http-error 
-                     (format #f "Stream failed with status ~a" 
-                             (status:exit-val status)))))))
-      
+               ;; Use safe-pipe-command instead of open-pipe*
+               (response (safe-pipe-command cmd)))
+
+          ;; Process response line by line
+          (for-each
+           (lambda (line)
+             (catch #t
+               (lambda ()
+                 (unless (string-null? line)
+                   (on-chunk line)))
+               (lambda (key . args)
+                 ;; Log error but continue
+                 (format (current-error-port)
+                         "Error processing chunk: ~a\n" key))))
+           (string-split response #\newline))))
+
       (lambda ()
         (cleanup-temp-file temp-file)))))
 
 (define (check-url-accessible url)
-  "Check if a URL is accessible."
+  "Check if a URL is accessible.
+   Uses safe-pipe-command to avoid FreeBSD popen segfaults."
   (catch #t
     (lambda ()
-      (let* ((cmd (format #f "curl -s -o /dev/null -w '%{http_code}' '~a' 2>/dev/null" url))
-             (port (open-pipe* OPEN_READ "/bin/sh" "-c" cmd))
-             (response (read-line port))
-             (status (close-pipe port)))
-        (and (zero? (status:exit-val status))
-             (string? response)
+      (let* ((cmd (format #f "curl -s -o /dev/null -w '%%{http_code}' '~a' 2>/dev/null" url))
+             (response (string-trim-both (safe-pipe-command cmd))))
+        (and (not (string-null? response))
              (string=? (string-take response 1) "2"))))
     (lambda (key . args) #f)))
 
