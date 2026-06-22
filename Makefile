@@ -1,7 +1,7 @@
 # Guile Scheme LLM Integration Toolkit Makefile
 # FreeBSD and Linux compatible
 
-.PHONY: all install install-guile-deps install-guile-json test clean help check-system
+.PHONY: all install install-guile-deps install-guile-json test test-ci clean help check-system
 
 # Detect operating system
 UNAME_S := $(shell uname -s)
@@ -221,8 +221,52 @@ test:
 	@if [ -f $(TEST_DIR)/008-contracts/test-contracts.scm ]; then \
 		$(GUILE) -L $(SRC_DIR) $(TEST_DIR)/008-contracts/test-contracts.scm || exit 1; \
 	fi
+	@# Run subprocess workaround regression test (FreeBSD spawn bug #79494)
+	@echo ""
+	@echo "Running subprocess workaround tests..."
+	@if [ -f $(TEST_DIR)/013-subprocess-test/test-subprocess.scm ]; then \
+		$(GUILE) -L $(SRC_DIR) $(TEST_DIR)/013-subprocess-test/test-subprocess.scm || exit 1; \
+	fi
+	@# Run retry logic tests
+	@echo ""
+	@echo "Running retry logic tests..."
+	@if [ -f $(TEST_DIR)/009-retry-test/test-retry.scm ]; then \
+		$(GUILE) -L $(SRC_DIR) $(TEST_DIR)/009-retry-test/test-retry.scm || exit 1; \
+	fi
+	@# Run prompt DSL tests
+	@echo ""
+	@echo "Running prompt DSL tests..."
+	@if [ -f $(TEST_DIR)/010-prompt-dsl/test-prompts.scm ]; then \
+		$(GUILE) -L $(SRC_DIR) $(TEST_DIR)/010-prompt-dsl/test-prompts.scm || exit 1; \
+	fi
+	@# Run structured output tests
+	@echo ""
+	@echo "Running structured output tests..."
+	@if [ -f $(TEST_DIR)/011-structured-output/test-structured.scm ]; then \
+		$(GUILE) -L $(SRC_DIR) $(TEST_DIR)/011-structured-output/test-structured.scm || exit 1; \
+	fi
 	@echo ""
 	@echo "All tests passed!"
+
+# Non-interactive, dependency-free test subset for CI.
+# Excludes 002-ollama (needs a server + is interactive) and the API-key
+# provider tests (005/006/007/012). Self-contained JSON, no external guile-json.
+test-ci:
+	@echo "Running CI test suite (non-interactive, no external services)..."
+	@echo "Using: $(GUILE)"
+	@set -e; for t in \
+		001-json-test/test-json \
+		003-provider-test/test-provider \
+		008-contracts/test-contracts \
+		009-retry-test/test-retry \
+		010-prompt-dsl/test-prompts \
+		011-structured-output/test-structured \
+		013-subprocess-test/test-subprocess; do \
+		echo ""; echo "==> $$t"; \
+		$(GUILE) -L $(SRC_DIR) $(TEST_DIR)/$$t.scm </dev/null || exit 1; \
+	done
+	@echo ""
+	@echo "CI tests passed!"
 
 # Install system-wide
 install: install-guile-deps

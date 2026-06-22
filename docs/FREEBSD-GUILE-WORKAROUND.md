@@ -75,7 +75,43 @@ functions. All HTTP operations (GET, POST, streaming) work without segfaults.
 The fix has been merged upstream (Codeberg PR #17) but is not yet in a
 released version. It should be available in Guile 3.0.11 or later.
 
-FreeBSD ports may also include the fix in a future package update.
+**Status (2026-06-22): NOT fixed in FreeBSD 14.4.** After upgrading hydra to
+`FreeBSD 14.4-RELEASE-p6` (and rebuilding `guile3-3.0.10`), the crash still
+reproduces from a clean `system*`/`open-input-pipe` call (SIGSEGV, rc=139).
+The faulting frame is `posix_spawn_file_actions_addclosefrom_np()` in
+`libc.so.7`, called from `libguile-3.0.so.1`. The workaround in this repo
+remains load-bearing. Full reproduction, backtrace, and the upstream-tracking
+write-up live in [`research/guile-spawn-bug-79494.org`](research/guile-spawn-bug-79494.org).
+
+## Debugging / Reproduction Notes
+
+To reproduce and capture evidence on a FreeBSD box:
+
+```bash
+# 1. Trigger the crash (cores land in cwd; kern.corefile = %N.core)
+guile3 -c '(system* "/bin/echo" "hi")'      # -> Segmentation fault (core dumped)
+
+# 2. Pull a backtrace from the core
+gdb -batch -q -ex bt /usr/local/bin/guile3 ./guile-3.0.core
+
+# 3. For an interactive session, drive it under tmux so the REPL and gdb
+#    share a pane layout and survive disconnects:
+tmux new -s guilebug 'gdb /usr/local/bin/guile3'
+#    then inside gdb:  run -c '(open-input-pipe "echo hi")'
+```
+
+Core files match `*.core` and are already gitignored — do not commit them
+(they are ~33 MB and host-specific).
+
+### Repo Boundaries
+
+- **In scope for this repo:** the `(llm utils subprocess)` workaround, its
+  tests, and documenting/reproducing the bug. We make the toolkit run
+  correctly on the affected platform.
+- **Out of scope:** patching Guile or FreeBSD `libc` themselves. The actual
+  fix belongs upstream (Guile / FreeBSD ports). This repo only carries
+  evidence and a submission-ready report to push that fix along — see the
+  research doc above.
 
 ## Testing
 
@@ -83,6 +119,13 @@ Run the validation script:
 
 ```bash
 ./experiments/validation-agents/validate.sh
+```
+
+Or the subprocess regression test (asserts the safe path works without
+touching the crashing primitives):
+
+```bash
+make test    # includes 013-subprocess-test
 ```
 
 All core modules should load and pass tests without segfaults.

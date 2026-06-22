@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  freebsd:
+    # FreeBSD is the platform that exposes Guile spawn bug #79494, so the
+    # (llm utils subprocess) workaround is exercised here specifically.
+    name: test (FreeBSD 14.4)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests in FreeBSD VM
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "14.4"
+          usesh: true
+          prepare: |
+            pkg install -y guile3 gmake bash
+          run: |
+            gmake test-ci
+
+  linux:
+    name: test (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Guile 3
+        run: sudo apt-get update && sudo apt-get install -y guile-3.0 make
+      - name: Run tests
+        run: make test-ci GUILE=guile-3.0

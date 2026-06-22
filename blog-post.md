@@ -312,4 +312,4 @@ While this approach won't replace Python for rapid prototyping or JavaScript for
 
 The complete toolkit, including source code, tutorials, and examples, is available at [scheme-llm-toolkit](https://github.com/aygp-dr/scheme-llm-toolkit). Whether you're a Scheme enthusiast, functional programming advocate, or simply curious about alternative approaches to AI integration, we invite you to explore how homoiconicity can make your LLM code more elegant and maintainable.
 
-*This blog post was developed alongside the actual implementation, with all code examples tested in production. The toolkit runs on FreeBSD 14.3-RELEASE and has been validated against real Ollama deployments.*
+*This blog post was developed alongside the actual implementation, with all code examples tested in production. The toolkit runs on FreeBSD 14.4-RELEASE-p6 and has been validated against real Ollama deployments.*

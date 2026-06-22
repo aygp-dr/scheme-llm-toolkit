@@ -143,10 +143,6 @@ The toolkit is organized into composable modules:
 ** Quick Start
 
 #+BEGIN_SRC bash
-# Clone and setup
-git clone https://github.com/aygp-dr/scheme-llm-toolkit.git
-cd scheme-llm-toolkit
-
 # Check dependencies (all core functionality tested)
 make install-guile-deps
 
